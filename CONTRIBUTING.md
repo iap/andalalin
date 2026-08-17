@@ -10,6 +10,17 @@ hermes-guide is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) p
 
 If a skill contains inaccurate guidance for a specific Hermes version, or is missing a known pitfall, please [open an issue](https://github.com/iap/hermes-guide/issues).
 
+## Branch Naming
+
+Short-lived branches, prefixed by type. Branch → merge to `master` → delete; never keep long-lived category buckets.
+
+| Prefix | Use for |
+|---|---|
+| `fix/` | Defects (wrong behavior), e.g. `fix/mcp-key-constants` |
+| `feat/` | Enhancements and refactors, e.g. `feat/plugin-hardening` |
+
+Add a new prefix only when you actually need it (`docs/`, `chore/`, …).
+
 ## Pull Requests
 
 1. Fork the repository.
