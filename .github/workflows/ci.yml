@@ -17,7 +17,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install Hermes
-        run: pip install hermes-agent
+        run: |
+          # pip/PyPI is no longer a supported Hermes distribution method
+          # (PyPI is stale at 0.19.0). Install from the upstream git tag as an
+          # editable install — wheel/sdist builds are blocked outside Nix, but
+          # editable installs are the documented dev path.
+          git clone --depth 1 --branch v2026.8.16 https://github.com/NousResearch/hermes-agent.git /tmp/hermes-agent
+          pip install -e /tmp/hermes-agent
 
       - name: Python syntax check
         run: python -m py_compile __init__.py checks.py constants.py
