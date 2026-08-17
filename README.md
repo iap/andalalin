@@ -79,7 +79,7 @@ Every diagnosis resolves to a concrete action: a `hermes <subcommand>` command o
 
 ## Contributing
 
-Content is verified against the installed Hermes Agent source and its shipped documentation (`website/docs/` in `hermes-agent`). When Hermes changes behavior, update the affected skill and bump its `version`. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Skills track the Hermes Agent source and its shipped documentation (`website/docs/` in `hermes-agent`). When Hermes changes behavior, update the affected skill and bump its `version`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
