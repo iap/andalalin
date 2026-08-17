@@ -16,6 +16,7 @@ findings (observer-only; nothing is injected or modified).
 
 import logging
 import pathlib
+import re
 import sys
 
 import yaml
@@ -57,7 +58,7 @@ def _format_result(results):
 def _skill_meta(skill_md):
     """Return (name, description) from a SKILL.md frontmatter, or (None, "")."""
     try:
-        text = skill_md.read_text(encoding="utf-8")
+        text = skill_md.read_text(encoding="utf-8-sig")
     except Exception:
         return None, ""
     if not text.startswith("---"):
@@ -84,7 +85,7 @@ def _register_skills(ctx):
         if not skill_md.is_file():
             continue
         name, description = _skill_meta(skill_md)
-        if not name:
+        if not name or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
             name = skill_dir.name
         try:
             ctx.register_skill(name, skill_md, description=description)

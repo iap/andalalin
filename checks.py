@@ -80,7 +80,7 @@ def _read_config():
 def _frontmatter(path):
     """Extract frontmatter dict from a SKILL.md (or None)."""
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             text = f.read()
     except Exception:
         return None
@@ -130,13 +130,12 @@ def check_mcp_servers_shape():
     if not path or data is None:
         return {"status": "unknown", "reason": "cannot read config", "detail": path}
 
-    with open(path, "r", encoding="utf-8") as f:
-        raw = f.read()
-
     broken = []
     notes = []
+    # Check parsed top-level keys (not raw text) so comments/strings don't
+    # trigger false "foreign key" findings.
     for key in constants.FOREIGN_MCP_KEYS:
-        if key in raw:
+        if key in data:
             broken.append(
                 f"foreign key `{key}` present (silently not read; use `{constants.CONFIG_MCP_SERVERS}`)"
             )

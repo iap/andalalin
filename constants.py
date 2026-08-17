@@ -15,10 +15,6 @@ FOREIGN_MCP_KEYS = ("mcpServers", "mcp.servers")
 MCP_STDIO_KEY = "command"
 MCP_HTTP_KEY = "url"
 
-# Current MCP tool naming convention (v0.20.x: double underscore)
-MCP_TOOL_NAME_PREFIX = "mcp__"
-MCP_TOOL_DELIM = "__"
-
 # Plugin sub-category directories that use their own discovery/selection keys
 # (memory.provider / context.engine / image_gen.provider / --provider) — NOT plugins.enabled.
 PLUGIN_SUBCATEGORY_DIRS = (
