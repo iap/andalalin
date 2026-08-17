@@ -39,3 +39,6 @@ jobs:
 
       - name: Plugin doctor
         run: hermes plugins doctor . --ci
+
+      - name: Docs self-claim guard
+        run: python tools/check_self_claim.py

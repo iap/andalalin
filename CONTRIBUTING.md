@@ -39,6 +39,16 @@ Add a new prefix only when you actually need it (`docs/`, `chore/`, …).
 - When Hermes changes behavior, update the affected skill(s) and bump their `version`.
 - See [AGENTS.md](AGENTS.md) for the full set of agent instructions and false-positive hazards to avoid.
 
+## Writing style
+
+Describe behavior — don't assert quality. Docs should say what the plugin and skills *do*, not how good they are.
+
+- ✅ "Skills track the Hermes source"
+- ✅ "Checks report malformed bundles, missing plugins, and slug collisions"
+- ❌ "The most reliable, fully accurate guide to Hermes"
+
+CI enforces this with a self-claim guard over all Markdown files (`tools/check_self_claim.py`). The deny-list lives in that script. If it trips, reword the line to a factual description of behavior.
+
 ## Questions?
 
 Open an issue and we'll help.
