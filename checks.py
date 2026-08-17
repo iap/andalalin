@@ -18,6 +18,7 @@ config, enable/disable anything, or auto-fix.
 
 import json
 import os
+import re
 import subprocess
 
 import yaml
@@ -77,8 +78,14 @@ def _read_config():
     return path, _cache["config_data"]
 
 
-def _frontmatter(path):
-    """Extract frontmatter dict from a SKILL.md (or None)."""
+def frontmatter(path):
+    """Extract the frontmatter mapping from a SKILL.md, or None if absent/invalid.
+
+    Single source of truth for frontmatter parsing, shared by the skills and
+    commands checks here and by the plugin's skill registry in __init__.py.
+    Returns None (not {}) for malformed or non-mapping frontmatter so callers
+    never call .get() on a list/scalar.
+    """
     try:
         with open(path, "r", encoding="utf-8-sig") as f:
             text = f.read()
@@ -90,9 +97,10 @@ def _frontmatter(path):
     if len(parts) < 3:
         return None
     try:
-        return yaml.safe_load(parts[1]) or {}
+        fm = yaml.safe_load(parts[1])
     except Exception:
-        return {}
+        return None
+    return fm if isinstance(fm, dict) else None
 
 
 def _iter_skills():
@@ -105,9 +113,35 @@ def _iter_skills():
             if os.path.isdir(skills_root):
                 for dirpath, _dirnames, filenames in os.walk(skills_root):
                     if "SKILL.md" in filenames:
-                        out.append((dirpath, _frontmatter(os.path.join(dirpath, "SKILL.md"))))
+                        out.append((dirpath, frontmatter(os.path.join(dirpath, "SKILL.md"))))
         _cache["skills"] = out
     return _cache["skills"]
+
+
+def _as_name_set(value):
+    """Normalize a config value (list or scalar string) into a set of names.
+
+    Guards against a scalar ``plugins.enabled: my-plugin`` — ``set("my-plugin")``
+    would explode into single characters and produce bogus findings.
+    """
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        return {value}
+    return set(value)
+
+
+# Slug normalization — identical to Hermes agent/skill_bundles.py::_slugify and
+# agent/skill_commands.py::scan_skill_commands (same patterns + steps).
+_BUNDLE_INVALID_CHARS = re.compile(r"[^a-z0-9-]")
+_BUNDLE_MULTI_HYPHEN = re.compile(r"-{2,}")
+
+
+def _bundle_slug(name):
+    """Normalize a skill/bundle name to the hyphenated slash-command slug."""
+    cmd = name.lower().replace(" ", "-").replace("_", "-")
+    cmd = _BUNDLE_INVALID_CHARS.sub("", cmd)
+    return _BUNDLE_MULTI_HYPHEN.sub("-", cmd).strip("-")
 
 
 # --- config ---------------------------------------------------------------
@@ -194,26 +228,64 @@ def check_skills():
 # --- commands -------------------------------------------------------------
 
 def check_commands():
-    """Detect skill-bundle slug collisions (a bundle shadows a skill of the same name)."""
+    """Detect skill-bundle slug collisions and malformed bundle files."""
     home = _hermes_home()
     if not home:
         return {"status": "unknown", "reason": "cannot resolve $HERMES_HOME", "detail": None}
 
-    skill_names = {fm.get("name") for _dirpath, fm in _iter_skills() if fm and fm.get("name")}
+    skill_slugs = set()
+    for _dirpath, fm in _iter_skills():
+        if fm and fm.get("name"):
+            s = _bundle_slug(fm.get("name"))
+            if s:
+                skill_slugs.add(s)
 
     collisions = []
+    malformed = []
     bundles_root = os.path.join(home, "skill-bundles")
     if os.path.isdir(bundles_root):
         for fn in sorted(os.listdir(bundles_root)):
             if not fn.endswith((".yaml", ".yml")):
                 continue
-            slug = fn.rsplit(".", 1)[0]
-            if slug in skill_names:
-                collisions.append(f"bundle `{slug}` shadows skill `{slug}` (bundle wins)")
+            stem = fn.rsplit(".", 1)[0]
+            bundle_path = os.path.join(bundles_root, fn)
+            try:
+                with open(bundle_path, "r", encoding="utf-8") as f:
+                    loaded = yaml.safe_load(f)
+            except Exception as exc:
+                malformed.append(f"bundle `{stem}` failed to parse: {exc}")
+                continue
 
+            # Mirror Hermes agent/skill_bundles.py::_load_bundle_file: a bundle
+            # must be a mapping with a non-empty `skills` list and a resolvable
+            # name/slug, otherwise Hermes skips it during slash-command discovery.
+            if not isinstance(loaded, dict):
+                malformed.append(f"bundle `{stem}` is not a mapping (skipped by Hermes)")
+                continue
+
+            skills = loaded.get("skills") or []
+            if not isinstance(skills, list):
+                malformed.append(f"bundle `{stem}`: `skills` is not a list (skipped by Hermes)")
+            elif not [s for s in skills if str(s).strip()]:
+                malformed.append(f"bundle `{stem}` has an empty `skills` list (skipped by Hermes)")
+
+            name = str(loaded.get("name") or stem).strip()
+            if not name:
+                malformed.append(f"bundle `{stem}` has no usable name (skipped by Hermes)")
+                continue
+            slug = _bundle_slug(name)
+            if not slug:
+                malformed.append(f"bundle `{stem}` yields an empty slug (skipped by Hermes)")
+                continue
+
+            if slug in skill_slugs:
+                collisions.append(f"bundle `{stem}` (/{slug}) shadows skill `/{slug}` (bundle wins)")
+
+    if malformed:
+        return {"status": "broken", "reason": f"{len(malformed)} malformed bundle(s)", "detail": malformed + collisions}
     if collisions:
         return {"status": "informational", "reason": f"{len(collisions)} bundle/skill slug collision(s)", "detail": collisions}
-    return {"status": "healthy", "reason": "no bundle/skill slug collisions", "detail": None}
+    return {"status": "healthy", "reason": "no bundle/skill slug collisions or malformed bundles", "detail": None}
 
 
 # --- hooks ----------------------------------------------------------------
@@ -249,15 +321,27 @@ def check_plugins():
 
     plugins_cfg = data.get("plugins")
     plugins_cfg = plugins_cfg if isinstance(plugins_cfg, dict) else {}
-    enabled = set(plugins_cfg.get("enabled") or [])
-    disabled = set(plugins_cfg.get("disabled") or [])
+    enabled = _as_name_set(plugins_cfg.get("enabled"))
+    disabled = _as_name_set(plugins_cfg.get("disabled"))
 
     plugins_root = os.path.join(home, "plugins")
+    skip = set(constants.PLUGIN_SUBCATEGORY_DIRS)
+
     if not os.path.isdir(plugins_root):
+        if enabled:
+            return {"status": "broken", "reason": "plugins.enabled is set but no plugins directory exists", "detail": plugins_root}
         return {"status": "healthy", "reason": "no plugins directory", "detail": plugins_root}
 
-    # Skip sub-category dirs that use their own discovery/selection (not plugins.enabled).
-    skip = set(constants.PLUGIN_SUBCATEGORY_DIRS)
+    broken = []
+    for name in sorted(enabled):
+        if name in skip:
+            continue  # sub-category dirs use their own selection keys, not plugins.enabled
+        pdir = os.path.join(plugins_root, name)
+        if not os.path.isdir(pdir):
+            broken.append(f"`{name}` is enabled but its directory is missing ({pdir})")
+        elif not os.path.isfile(os.path.join(pdir, "plugin.yaml")):
+            broken.append(f"`{name}` is enabled but has no plugin.yaml manifest")
+
     notes = []
     for name in sorted(os.listdir(plugins_root)):
         if name in skip or name.startswith("."):
@@ -267,6 +351,8 @@ def check_plugins():
         if name not in enabled and name not in disabled:
             notes.append(f"`{name}` discovered but not enabled (opt-in)")
 
+    if broken:
+        return {"status": "broken", "reason": f"{len(broken)} enabled plugin(s) missing or broken", "detail": broken + notes}
     if notes:
         return {"status": "informational", "reason": f"{len(notes)} plugin(s) not enabled", "detail": notes}
     return {"status": "healthy", "reason": "plugins consistent with enable list", "detail": sorted(enabled)}

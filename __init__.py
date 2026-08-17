@@ -19,8 +19,6 @@ import pathlib
 import re
 import sys
 
-import yaml
-
 from . import checks
 
 logger = logging.getLogger(__name__)
@@ -57,20 +55,8 @@ def _format_result(results):
 
 def _skill_meta(skill_md):
     """Return (name, description) from a SKILL.md frontmatter, or (None, "")."""
-    try:
-        text = skill_md.read_text(encoding="utf-8-sig")
-    except Exception:
-        return None, ""
-    if not text.startswith("---"):
-        return None, ""
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return None, ""
-    try:
-        fm = yaml.safe_load(parts[1]) or {}
-    except Exception:
-        return None, ""
-    if not isinstance(fm, dict):
+    fm = checks.frontmatter(skill_md)
+    if not fm:
         return None, ""
     return fm.get("name"), fm.get("description", "")
 
