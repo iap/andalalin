@@ -1,0 +1,19 @@
+name: hermes-guide
+version: 0.1.0
+description: >-
+  Executable, read-only diagnostics for Hermes configuration. Runs deterministic
+  health checks across MCP servers, skills, commands, hooks, and plugins.
+manifest_version: 2
+api_version: 1
+license: MIT
+homepage: https://github.com/iap/hermes-guide
+tags: [guide, diagnostics, observability, troubleshooting]
+python_dependencies:
+  - PyYAML>=6.0,<7
+# No `capabilities:` block = zero privileged capabilities. This plugin only
+# reads config and inspects state, so the consent screen stays trivial.
+config_schema:
+  proactive:
+    type: bool
+    default: false
+    description: "Fire drift checks on session start/end (opt-in)"

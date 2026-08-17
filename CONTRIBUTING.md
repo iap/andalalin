@@ -1,23 +1,33 @@
 # Contributing
 
-Thank you for your interest in contributing! Here are some guidelines to help you get started.
+Thank you for your interest in contributing to hermes-guide!
+
+## What this project is
+
+hermes-guide is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin + skills tap. The plugin (`plugin.yaml` + `__init__.py`/`checks.py`/`constants.py`) ships read-only diagnostics (`/hermes-doctor` and `hermes guide`), and the `skills/` directory bundles six SKILL.md files that teach configuration and troubleshooting for MCP, skills, commands, hooks, and plugins.
 
 ## Reporting Issues
 
-If you find a bug or have a feature request, please open an issue on GitHub.
+If a skill contains inaccurate guidance for a specific Hermes version, or is missing a known pitfall, please [open an issue](https://github.com/iap/hermes-guide/issues).
 
 ## Pull Requests
 
 1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/my-feature`).
-3. Make your changes and commit with a descriptive message.
-4. Push to your branch (`git push origin feature/my-feature`).
-5. Open a pull request.
+2. Create a feature branch (`git checkout -b fix/diagnosing-mcp-oauth`).
+3. Edit or add SKILL.md files under `skills/<name>/`, and/or the plugin files (`plugin.yaml`, `__init__.py`, `checks.py`, `constants.py`).
+4. Verify frontmatter parses (valid YAML between `---` fences, `name`, `description`, `version`).
+5. Run `python -m py_compile __init__.py checks.py constants.py` and `hermes plugins doctor . --ci`.
+6. Cross-check every `hermes <subcommand>` reference against the installed Hermes docs or `--help` output.
+7. Commit with a descriptive message and open a pull request.
 
-## Code Style
+## Content Guidelines
 
-Please follow the existing code style in the project. If a linter or formatter is configured, make sure your code passes before submitting.
+- Every diagnosis must resolve to a concrete action: a `hermes <subcommand>` or a specific file + field edit, then `/reload-*` or restart.
+- Hermes configuration is YAML (`config.yaml`), never JSON.
+- `$HERMES_HOME` is `~/.hermes` on POSIX, `%LOCALAPPDATA%\hermes` on native Windows. Teach `hermes config path` as ground truth.
+- When Hermes changes behavior, update the affected skill(s) and bump their `version`.
+- See [AGENTS.md](AGENTS.md) for the full set of agent instructions and false-positive hazards to avoid.
 
 ## Questions?
 
-If you have any questions, feel free to open an issue and we'll be happy to help.
+Open an issue and we'll help.

@@ -2,17 +2,15 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Only the latest published version (`0.1.0`) receives security fixes.
 
 | Version | Supported |
 | --- | --- |
-| latest | :white_check_mark: |
+| 0.1.0 | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability, please report it responsibly by
-opening a [private issue](https://github.com/iap/.github/issues/new) or
-contacting the maintainer at <6572003+iap@users.noreply.github.com>. We will respond as soon as possible and work with you to address the issue.
+opening a [private security advisory](https://github.com/iap/hermes-guide/security/advisories/new). We will respond as soon as possible and work with you to address the issue.
 
 Please do not publicly disclose the vulnerability until it has been resolved.

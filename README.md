@@ -1,25 +1,86 @@
-# .github
+# Hermes Guide
 
-A starter template for new GitHub repositories.
+> **Package / slug:** `hermes-guide`
+
+Hermes usage and self-diagnosis guide for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It ships two things:
+
+1. **A plugin** — `/hermes-doctor` (in-session) and `hermes guide` (terminal): read-only diagnostics across config, MCP servers, skills, commands, hooks, and plugins.
+2. **Six troubleshooting skills** — teach an agent how to locate and fix each surface.
+
+## Install the plugin
+
+```bash
+hermes plugins install iap/hermes-guide --enable
+```
+
+This clones the repo from GitHub and enables it. To pin an immutable commit:
+
+```bash
+hermes plugins install iap/hermes-guide --ref <40-char-SHA> --enable
+```
+
+### Manual install
+
+Alternatively, copy this repo into your Hermes plugins directory:
+
+```bash
+# POSIX: $HERMES_HOME is ~/.hermes
+cp -r . ~/.hermes/plugins/hermes-guide/
+hermes plugins enable hermes-guide
+```
+
+On native Windows `$HERMES_HOME` is `%LOCALAPPDATA%\hermes` (not `~/.hermes`); run `hermes config path` to confirm.
+
+## Usage
+
+- In a session: `/hermes-doctor` (all surfaces) or `/hermes-doctor mcp` (one surface).
+- In a terminal: `hermes guide` — exits `1` if any surface is broken.
+
+### Proactive mode (opt-in)
+
+Add to `config.yaml`:
+
+```yaml
+plugins:
+  entries:
+    hermes-guide:
+      settings:
+        proactive: true
+```
+
+Drift findings are then logged at session start/end — watch `hermes logs --follow`.
+
+## Install the skills (tap)
+
+Add this repo as a skills tap, then install what you want:
+
+```bash
+hermes skills tap add iap/hermes-guide
+hermes skills search hermes
+hermes skills install iap/hermes-guide/hermes-configuration-guide
+```
+
+Each installed skill is also available as a slash command (e.g. `/hermes-configuration-guide`).
 
 ## What's included
 
-| File | Description |
+| Skill | Purpose |
 |---|---|
-| `LICENSE` | MIT License |
-| `.gitignore` | General-purpose gitignore (OS, editor, env, and common build artifacts) |
-| `CONTRIBUTING.md` | Guidelines for contributing |
-| `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1 |
-| `SECURITY.md` | Security policy |
-| `.github/workflows/ci.yml` | Generic GitHub Actions CI workflow |
-| `AGENTS.md` | Instructions for AI coding agents (`CLAUDE.md` imports it) |
+| `hermes-configuration-guide` | The map: resolving `$HERMES_HOME`, where each surface is configured, instruction files, and routing to the diagnostic skills |
+| `diagnosing-mcp` | MCP servers that won't connect, expose no tools, fail OAuth, or ignore `mcp_servers:` config |
+| `diagnosing-skills` | Skills not discovered, shadowed, hidden by platform/toolset conditions, or stuck "user-modified" |
+| `diagnosing-commands` | Missing or overridden slash commands — skills-as-commands, bundles, plugin commands, per-platform permissions |
+| `diagnosing-hooks` | Hooks that don't fire — the four hook systems, shell-hook consent, `hermes hooks doctor` |
+| `diagnosing-plugins` | Plugins that don't load — the `plugins.enabled` gate, capability consent, discovery locations |
 
-## How to use
+## Design principle
 
-1. Go to the [template repository](https://github.com/new?template_owner=iap&template_name=.github).
-2. Create a new repository from this template.
-3. Customize the files for your project.
+Every diagnosis resolves to a concrete action: a `hermes <subcommand>` command or a specific file + field edit, then a `/reload-*` or restart to apply.
+
+## Contributing
+
+Content is verified against the installed Hermes Agent source and its shipped documentation (`website/docs/` in `hermes-agent`). When Hermes changes behavior, update the affected skill and bump its `version`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
