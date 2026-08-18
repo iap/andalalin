@@ -3,8 +3,14 @@
 
 Hermes plugins must be read-only: observe and report, never write. This guard
 parses the plugin's Python sources with ``ast`` and exits non-zero when it finds
-filesystem writes, config mutation, or mutating subprocesses — turning the
-read-only contract into an enforced CI invariant rather than a convention.
+filesystem writes, config mutation, or mutating subprocesses.
+
+Scope note: this is a *developer-discipline lint* — it catches obvious or
+accidental writes and keeps contributors honest. It is NOT a security boundary.
+The hard boundary is the plugin's absence of a ``capabilities:`` block (see
+``plugin.yaml``), which grants zero privileged write permissions regardless of
+what the code says. A determined actor can always obfuscate a write past any
+static check; the capabilities model is what actually blocks it at runtime.
 
 AST parsing (rather than line-based regex) makes the guard multiline-aware, so a
 write call split across lines can't slip through. Scanned: ``*.py`` under the
@@ -32,12 +38,31 @@ _WRITE_FLAGS = "wax+"
 # Subprocess invocations that indicate mutation.
 _MUTATING_SUBPROCESS_TERMS = ("pip", "install", "uninstall")
 
-# os / shutil mutation calls.
-_OS_MUTATIONS = ("remove", "unlink", "rename", "replace", "mkdir", "makedirs")
-_SHUTIL_MUTATIONS = ("rmtree", "move", "copy", "copy2", "copyfile", "copytree")
+# pathlib.Path mutating methods — flagged on any receiver.
+# NOTE: `rename` and `replace` are intentionally omitted: `str.replace()` is a
+# read-only string method that would false-positive. The os.* forms
+# (os.rename/os.replace) are still caught by the os receiver check below.
+_PATH_MUTATING_METHODS = {
+    "write_text", "write_bytes",  # file content
+    "mkdir", "touch",             # create dir/file
+    "unlink", "rmdir",            # delete file/dir
+    "symlink_to", "hardlink_to",  # links
+    "chmod",                      # permissions
+}
 
-# Path-like write helpers.
-_WRITE_METHODS = ("write_text", "write_bytes")
+# os / shutil / tempfile mutation functions.
+_OS_MUTATIONS = {
+    "remove", "unlink", "rename", "replace", "mkdir", "makedirs",
+    "chmod", "chown", "utime", "link", "symlink", "mkfifo", "truncate",
+}
+_SHUTIL_MUTATIONS = {
+    "rmtree", "move", "copy", "copy2", "copyfile", "copytree",
+    "make_archive", "unpack_archive", "chown",
+}
+_TEMPFILE_MUTATIONS = {
+    "TemporaryFile", "NamedTemporaryFile", "SpooledTemporaryFile",
+    "mkstemp", "mkdtemp", "TemporaryDirectory",
+}
 
 
 def _is_write_mode(node: ast.AST) -> bool:
@@ -99,6 +124,7 @@ def _detect(tree: ast.AST) -> list[tuple[int, str]]:
         ):
             if _open_mode_is_write(node):
                 hits.append((node.lineno, "write-mode open()/Path.open()"))
+                continue
 
         # yaml.dump / yaml.safe_dump / json.dump
         if (
@@ -108,37 +134,28 @@ def _detect(tree: ast.AST) -> list[tuple[int, str]]:
             and func.value.id in ("yaml", "json")
         ):
             hits.append((node.lineno, f"{func.value.id}.{func.attr}()"))
+            continue
 
-        # Path.write_text / write_bytes
-        if isinstance(func, ast.Attribute) and func.attr in _WRITE_METHODS:
+        # os / shutil / tempfile / subprocess module calls
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+            mod = func.value.id
+            if mod == "os" and func.attr in _OS_MUTATIONS:
+                hits.append((node.lineno, f"os.{func.attr}()"))
+                continue
+            if mod == "shutil" and func.attr in _SHUTIL_MUTATIONS:
+                hits.append((node.lineno, f"shutil.{func.attr}()"))
+                continue
+            if mod == "tempfile" and func.attr in _TEMPFILE_MUTATIONS:
+                hits.append((node.lineno, f"tempfile.{func.attr}()"))
+                continue
+            if mod == "subprocess" and _subprocess_mutates(node):
+                hits.append((node.lineno, "mutating subprocess (pip/install/uninstall)"))
+                continue
+
+        # pathlib mutating methods (any receiver)
+        if isinstance(func, ast.Attribute) and func.attr in _PATH_MUTATING_METHODS:
             hits.append((node.lineno, f".{func.attr}()"))
-
-        # os.remove/unlink/rename/replace/mkdir/makedirs
-        if (
-            isinstance(func, ast.Attribute)
-            and isinstance(func.value, ast.Name)
-            and func.value.id == "os"
-            and func.attr in _OS_MUTATIONS
-        ):
-            hits.append((node.lineno, f"os.{func.attr}()"))
-
-        # shutil.rmtree/move/copy/...
-        if (
-            isinstance(func, ast.Attribute)
-            and isinstance(func.value, ast.Name)
-            and func.value.id == "shutil"
-            and func.attr in _SHUTIL_MUTATIONS
-        ):
-            hits.append((node.lineno, f"shutil.{func.attr}()"))
-
-        # subprocess that installs/uninstalls
-        if (
-            isinstance(func, ast.Attribute)
-            and isinstance(func.value, ast.Name)
-            and func.value.id == "subprocess"
-            and _subprocess_mutates(node)
-        ):
-            hits.append((node.lineno, "mutating subprocess (pip/install/uninstall)"))
+            continue
 
     return hits
 
@@ -167,8 +184,9 @@ def scan(path: Path) -> list[str]:
     return hits
 
 
-# Regression table: (snippet, should_be_detected). Covers both open() signatures,
-# keyword and positional modes, multiline formatting, and read-only negatives.
+# Regression table: (snippet, should_be_detected). Covers open() signatures,
+# keyword/positional/multiline modes, pathlib writes, module functions, and
+# read-only negatives.
 _SELFTEST_CASES: list[tuple[str, bool]] = [
     ('open(path, "r", encoding="utf-8")', False),
     ('open(path, "w")', True),
@@ -183,13 +201,26 @@ _SELFTEST_CASES: list[tuple[str, bool]] = [
     ('Path("out").open("wb")', True),
     ('Path("out").open(mode="a")', True),
     ('Path("out").open(\n    "w"\n)', True),  # multiline write must be caught
+    ("Path('out').mkdir()", True),
+    ("Path('out').touch()", True),
+    ("Path('out').unlink()", True),
+    ("Path('out').rmdir()", True),
+    ("os.rename('a', 'b')", True),
+    ("os.replace('a', 'b')", True),
+    ('s.replace(" ", "-")', False),  # str.replace is read-only — must NOT flag
+    ("Path('out').symlink_to('x')", True),
+    ("Path('x').write_text(s)", True),
     ("yaml.dump(data, f)", True),
     ("yaml.safe_load(text)", False),
     ("json.dump(data, f)", True),
-    ('Path("x").write_text(s)', True),
     ("os.remove(p)", True),
     ("os.makedirs(p)", True),
+    ("os.chmod(p, 0o600)", True),
+    ("os.symlink(a, b)", True),
     ("shutil.rmtree(p)", True),
+    ("shutil.copytree(a, b)", True),
+    ("tempfile.NamedTemporaryFile()", True),
+    ("tempfile.mkdtemp()", True),
     ('subprocess.run(["hermes", "config", "path"])', False),
     ('subprocess.run(["pip", "install", "x"])', True),
 ]
