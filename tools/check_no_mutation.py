@@ -35,8 +35,9 @@ _EXCLUDE_DIRS = {"tools"}
 # A "mode" string is a write mode if it contains any of these flags.
 _WRITE_FLAGS = "wax+"
 
-# Subprocess invocations that indicate mutation.
-_MUTATING_SUBPROCESS_TERMS = ("pip", "install", "uninstall")
+# Subprocess invocations that indicate mutation. Token-based (not substring)
+# so `pipeline`, `installer`, etc. don't false positive.
+_MUTATING_SUBPROCESS_TOKENS = {"pip", "pip3", "install", "uninstall"}
 
 # pathlib.Path mutating methods — flagged on any receiver.
 # NOTE: `rename` and `replace` are handled separately below (arity check),
@@ -103,10 +104,9 @@ def _iter_string_literals(node: ast.AST):
 
 
 def _subprocess_mutates(call: ast.Call) -> bool:
-    """True if a subprocess call mentions pip/install/uninstall in its args."""
+    """True if a subprocess call mentions pip/install/uninstall as a token."""
     for value in _iter_string_literals(call):
-        lowered = value.lower()
-        if any(term in lowered for term in _MUTATING_SUBPROCESS_TERMS):
+        if any(tok in _MUTATING_SUBPROCESS_TOKENS for tok in value.lower().split()):
             return True
     return False
 
@@ -134,7 +134,14 @@ def _detect(tree: ast.AST) -> list[tuple[int, str]]:
             and isinstance(func.value, ast.Name)
             and func.value.id in ("yaml", "json")
         ):
-            hits.append((node.lineno, f"{func.value.id}.{func.attr}()"))
+            mod = func.value.id
+            # json.dump() always needs a writable fp; yaml.dump()/safe_dump()
+            # only write when a stream is passed — single-arg yaml.dump returns
+            # a string and must not false positive.
+            if mod == "json" or len(node.args) >= 2 or any(
+                kw.arg == "stream" for kw in node.keywords
+            ):
+                hits.append((node.lineno, f"{mod}.{func.attr}()"))
             continue
 
         # os / shutil / tempfile / subprocess module calls
@@ -160,13 +167,12 @@ def _detect(tree: ast.AST) -> list[tuple[int, str]]:
 
         # Path.rename(target) / Path.replace(target) mutate the filesystem but
         # share their names with str.replace(old, new) (read-only). Distinguish
-        # by arity: str.replace takes >=2 positional args, the pathlib forms
-        # take exactly 1.
+        # by arity: str.replace takes 2+ args (positional or old=/new=), the
+        # pathlib forms take exactly one target (positional or target=).
         if (
             isinstance(func, ast.Attribute)
             and func.attr in ("rename", "replace")
-            and len(node.args) == 1
-            and not node.keywords
+            and len(node.args) + len(node.keywords) == 1
         ):
             hits.append((node.lineno, f".{func.attr}()"))
             continue
@@ -240,6 +246,11 @@ _SELFTEST_CASES: list[tuple[str, bool]] = [
     ("tempfile.mkdtemp()", True),
     ('subprocess.run(["hermes", "config", "path"])', False),
     ('subprocess.run(["pip", "install", "x"])', True),
+    ('subprocess.run(["echo", "pipeline installer"])', False),  # token, not substring
+    ("yaml.dump(data)", False),  # no stream -> returns str, read-only
+    ("yaml.safe_dump(data)", False),
+    ("yaml.dump(data, stream=f)", True),
+    ("Path('a').rename(target='b')", True),  # keyword target form
 ]
 
 
