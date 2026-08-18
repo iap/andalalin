@@ -10,6 +10,10 @@ Scanned: ``*.py`` under the repo root, excluding ``tools/`` (CI-time utilities;
 the guard itself lives there and contains these patterns as regex literals).
 
 Style and CI wiring mirror tools/check_self_claim.py.
+
+Usage:
+    python tools/check_no_mutation.py            # scan plugin Python sources
+    python tools/check_no_mutation.py --selftest # regression-check the patterns
 """
 
 from __future__ import annotations
@@ -24,11 +28,20 @@ from pathlib import Path
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "write-mode open()",
-        # Mode string (2nd positional arg) containing a write flag: w, a, x,
-        # or "+" (r+/w+/a+). Read-only "r"/"rb" do not match.
+        # Builtin open(): mode is the 2nd positional arg (after a comma).
+        # Write flags are w, a, x, or "+" (r+/w+/a+). Read-only "r"/"rb" pass.
         re.compile(r"open\s*\(\s*[^,]+,\s*[\"'][^\"']*(?:w|a|x|\+)[^\"']*[\"']"),
     ),
-    ("write-mode open(..., mode=...)", re.compile(r"open\s*\([^)]*mode\s*=\s*[\"'][^\"']*(?:w|a|x|\+)[^\"']*[\"']")),
+    (
+        "write-mode open(..., mode=...)",
+        re.compile(r"open\s*\([^)]*mode\s*=\s*[\"'][^\"']*(?:w|a|x|\+)[^\"']*[\"']"),
+    ),
+    (
+        "Path.open() write (positional mode)",
+        # pathlib.Path.open(mode, ...) takes the mode as its FIRST positional
+        # argument, so a `.open("w")` method call has no comma before the mode.
+        re.compile(r"\.open\s*\(\s*[\"'][^\"']*(?:w|a|x|\+)[^\"']*[\"']"),
+    ),
     ("yaml.dump", re.compile(r"\byaml\.(?:safe_)?dump\b")),
     ("json.dump", re.compile(r"\bjson\.dump\b")),
     ("Path.write_text", re.compile(r"\.write_text\s*\(")),
@@ -45,6 +58,31 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 # CI-time utilities excluded from the scan (not plugin runtime code).
 _EXCLUDE_DIRS = {"tools"}
 
+# Regression table: (snippet, should_a_pattern_match). Covers both open()
+# signatures and read-only negatives so a regex tweak can't silently reopen a hole.
+_SELFTEST_CASES: list[tuple[str, bool]] = [
+    ('open(path, "r", encoding="utf-8")', False),
+    ('open(path, "w")', True),
+    ('open(path, "a", encoding="utf-8")', True),
+    ('open(path, "rb")', False),
+    ('open(path, "wb")', True),
+    ('open(path, "r+")', True),
+    ('open(path, mode="w")', True),
+    ('open(path, mode="r")', False),
+    ('Path("out").open("w")', True),
+    ('Path("out").open("r")', False),
+    ('Path("out").open("wb")', True),
+    ('Path("out").open(mode="a")', True),
+    ("yaml.dump(data, f)", True),
+    ("yaml.safe_load(text)", False),
+    ('Path("x").write_text(s)', True),
+    ("os.remove(p)", True),
+    ("os.makedirs(p)", True),
+    ("shutil.rmtree(p)", True),
+    ('subprocess.run(["hermes", "config", "path"])', False),
+    ('subprocess.run(["pip", "install", "x"])', True),
+]
+
 
 def scan(path: Path) -> list[str]:
     """Return "path:lineno: line" strings for every offending line in `path`."""
@@ -57,7 +95,28 @@ def scan(path: Path) -> list[str]:
     return hits
 
 
+def selftest() -> int:
+    """Verify the patterns against the regression table; exit non-zero on drift."""
+    failures = 0
+    for snippet, expect in _SELFTEST_CASES:
+        matched = any(pattern.search(snippet) for _, pattern in _PATTERNS)
+        if matched != expect:
+            failures += 1
+            print(
+                f"SELFTEST FAIL: expected match={expect} got={matched} for: {snippet}",
+                file=sys.stderr,
+            )
+    if failures:
+        print(f"{failures} selftest case(s) failed", file=sys.stderr)
+        return 1
+    print(f"selftest OK: {len(_SELFTEST_CASES)} cases")
+    return 0
+
+
 def main(argv: list[str]) -> int:
+    if "--selftest" in argv:
+        return selftest()
+
     root = Path(argv[1]) if len(argv) > 1 else Path(".")
     targets = [
         p

@@ -44,4 +44,6 @@ jobs:
         run: python tools/check_self_claim.py
 
       - name: No-mutation guard
-        run: python tools/check_no_mutation.py
+        run: |
+          python tools/check_no_mutation.py --selftest
+          python tools/check_no_mutation.py
