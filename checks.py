@@ -152,6 +152,14 @@ def _bundle_slug(name):
     return _BUNDLE_MULTI_HYPHEN.sub("-", cmd).strip("-")
 
 
+def _rel_path(path, base):
+    """Return `path` relative to `base` for compact, unambiguous diagnostics."""
+    try:
+        return os.path.relpath(path, base)
+    except ValueError:  # different drives (Windows)
+        return path
+
+
 # --- config ---------------------------------------------------------------
 
 def check_config_parses():
@@ -211,6 +219,11 @@ def check_mcp_servers_shape():
             if not isinstance(entry, dict):
                 broken.append(f"`{constants.CONFIG_MCP_SERVERS}.{name}` is not a mapping")
                 continue
+            if "disabled" in entry:
+                notes.append(
+                    f"`{constants.CONFIG_MCP_SERVERS}.{name}` uses `disabled:` "
+                    f"(not read by Hermes; server stays enabled) — set `enabled: false` to disable"
+                )
             if not _parse_enabled(entry.get("enabled")):
                 notes.append(f"`{constants.CONFIG_MCP_SERVERS}.{name}` is disabled (skipped)")
                 continue
@@ -275,8 +288,8 @@ def check_commands():
                 skill_slugs.add(s)
                 if s in skill_slug_owners:
                     collisions.append(
-                        f"skill `{os.path.basename(skill_slug_owners[s])}` and "
-                        f"`{os.path.basename(dirpath)}` both normalize to `/{s}` (first wins)"
+                        f"skill `{_rel_path(skill_slug_owners[s], home)}` and "
+                        f"`{_rel_path(dirpath, home)}` both normalize to `/{s}` (first wins)"
                     )
                 else:
                     skill_slug_owners[s] = dirpath
