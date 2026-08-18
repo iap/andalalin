@@ -39,9 +39,10 @@ _WRITE_FLAGS = "wax+"
 _MUTATING_SUBPROCESS_TERMS = ("pip", "install", "uninstall")
 
 # pathlib.Path mutating methods — flagged on any receiver.
-# NOTE: `rename` and `replace` are intentionally omitted: `str.replace()` is a
-# read-only string method that would false-positive. The os.* forms
-# (os.rename/os.replace) are still caught by the os receiver check below.
+# NOTE: `rename` and `replace` are handled separately below (arity check),
+# because `str.replace()` is a read-only string method that would false
+# positive. The os.* forms (os.rename/os.replace) are caught by the os
+# receiver check.
 _PATH_MUTATING_METHODS = {
     "write_text", "write_bytes",  # file content
     "mkdir", "touch",             # create dir/file
@@ -157,6 +158,19 @@ def _detect(tree: ast.AST) -> list[tuple[int, str]]:
             hits.append((node.lineno, f".{func.attr}()"))
             continue
 
+        # Path.rename(target) / Path.replace(target) mutate the filesystem but
+        # share their names with str.replace(old, new) (read-only). Distinguish
+        # by arity: str.replace takes >=2 positional args, the pathlib forms
+        # take exactly 1.
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr in ("rename", "replace")
+            and len(node.args) == 1
+            and not node.keywords
+        ):
+            hits.append((node.lineno, f".{func.attr}()"))
+            continue
+
     return hits
 
 
@@ -208,6 +222,9 @@ _SELFTEST_CASES: list[tuple[str, bool]] = [
     ("os.rename('a', 'b')", True),
     ("os.replace('a', 'b')", True),
     ('s.replace(" ", "-")', False),  # str.replace is read-only — must NOT flag
+    ('name.replace(" ", "-").replace("_", "-")', False),  # chained str.replace
+    ("Path('a').rename('b')", True),
+    ("Path('a').replace('b')", True),
     ("Path('out').symlink_to('x')", True),
     ("Path('x').write_text(s)", True),
     ("yaml.dump(data, f)", True),
