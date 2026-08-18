@@ -9,7 +9,10 @@ Do not scatter these strings across checks.py or __init__.py.
 CONFIG_MCP_SERVERS = "mcp_servers"
 
 # Foreign keys that indicate a Claude-Code-style paste (silently NOT read by Hermes)
-FOREIGN_MCP_KEYS = ("mcpServers", "mcp.servers")
+# Top-level foreign key from a Claude-Code-style paste that Hermes silently ignores.
+# (Dropped the dead `"mcp.servers"` entry: `key in data` only matches top-level
+# keys, so a dotted name never matched the nested `mcp.servers` it was meant for.)
+FOREIGN_MCP_KEYS = ("mcpServers",)
 
 # MCP server shape requirements (per entry): stdio needs `command`, http needs `url`
 MCP_STDIO_KEY = "command"
@@ -25,4 +28,7 @@ PLUGIN_SUBCATEGORY_DIRS = (
     "image_gen",
     "video_gen",
     "web",
+    "browser",
+    "cron_providers",
+    "observability",
 )
