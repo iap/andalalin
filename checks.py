@@ -131,7 +131,9 @@ def _as_name_set(value):
     if isinstance(value, str):
         return {value}
     if isinstance(value, (list, tuple, set, frozenset)):
-        return set(value)
+        # Keep only string names: malformed entries (dicts, ints, ...) must not
+        # reach set()/sorted() and crash the diagnostic.
+        return {v for v in value if isinstance(v, str)}
     # bool/int/float/dict/… are ignored (Hermes requires a list for `enabled`).
     return set()
 
@@ -263,7 +265,7 @@ def check_commands():
         return {"status": "unknown", "reason": "cannot resolve $HERMES_HOME", "detail": None}
 
     skill_slugs = set()
-    skill_slug_owners = {}  # slug -> first skill dir (first-wins, mirrors Hermes)
+    skill_slug_owners: dict[str, str] = {}  # slug -> first skill dir (first-wins, mirrors Hermes)
     collisions = []
     for dirpath, fm in _iter_skills():
         if fm and fm.get("name"):
@@ -279,7 +281,7 @@ def check_commands():
                     skill_slug_owners[s] = dirpath
 
     malformed = []
-    bundle_slugs = {}  # slug -> first bundle stem (bundle-vs-bundle first-wins)
+    bundle_slugs: dict[str, str] = {}  # slug -> first bundle stem (bundle-vs-bundle first-wins)
     bundles_root = os.path.join(home, "skill-bundles")
     if os.path.isdir(bundles_root):
         for fn in sorted(os.listdir(bundles_root)):
