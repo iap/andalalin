@@ -16,6 +16,7 @@ shell out to `hermes ... doctor`-style read-only commands. They never mutate
 config, enable/disable anything, or auto-fix.
 """
 
+import importlib
 import json
 import os
 import re
@@ -361,6 +362,69 @@ def check_hooks():
 
 # --- plugins --------------------------------------------------------------
 
+def _bundled_plugins_dir():
+    """Resolve the bundled plugins directory the loader scans, or None.
+
+    Uses Hermes' own resolver so nested category layouts (browser/, image_gen/,
+    model-providers/, platforms/, ...) resolve exactly as the loader does. The
+    import is dynamic (importlib) so it stays mypy-clean and the check still
+    runs when imported outside a live Hermes process (e.g. in a unit test).
+    """
+    try:
+        resolver = getattr(importlib.import_module("hermes_cli.plugins"), "get_bundled_plugins_dir")
+        return str(resolver())
+    except Exception:
+        return None
+
+
+def _read_plugin_manifest(d):
+    """Return a directory plugin's manifest ``name``, or None if none exists.
+
+    Accepts ``plugin.yaml`` then ``plugin.yml``, mirroring
+    ``plugins_cmd._read_manifest_info``. Portable Agent Plugins v1 packages
+    (``plugin.json``) install disabled by default and are out of scope here.
+    """
+    manifest_file = os.path.join(d, "plugin.yaml")
+    if not os.path.isfile(manifest_file):
+        manifest_file = os.path.join(d, "plugin.yml")
+    if not os.path.isfile(manifest_file):
+        return None
+    try:
+        with open(manifest_file, "r", encoding="utf-8") as f:
+            manifest = yaml.safe_load(f) or {}
+        name = manifest.get("name")
+    except Exception:
+        name = None
+    if name is None:
+        name = os.path.basename(d)
+    return name
+
+
+def _collect_plugin_ids(root, prefix, depth, skip_names, seen):
+    """Recursively collect discoverable plugin identifiers, mirroring
+    ``plugins_cmd._scan_level``: a plugin resolves by its manifest ``name`` or
+    its path-derived ``key`` (``<category>/<dirname>``). Both are added to
+    *seen* so ``plugins.enabled`` matches by name or key alike."""
+    if not root or not os.path.isdir(root):
+        return
+    for d in sorted(os.listdir(root)):
+        dpath = os.path.join(root, d)
+        if not os.path.isdir(dpath):
+            continue
+        if depth == 0 and skip_names and d in skip_names:
+            continue
+        name = _read_plugin_manifest(dpath)
+        if name is not None:
+            key = f"{prefix}/{d}" if prefix else name
+            seen.add(name)
+            seen.add(key)
+            continue
+        if depth >= 1:
+            continue
+        sub_prefix = f"{prefix}/{d}" if prefix else d
+        _collect_plugin_ids(dpath, sub_prefix, depth + 1, set(), seen)
+
+
 def check_plugins():
     path, data = _read_config()
     home = _hermes_home()
@@ -375,29 +439,30 @@ def check_plugins():
     plugins_root = os.path.join(home, "plugins")
     skip = set(constants.PLUGIN_SUBCATEGORY_DIRS)
 
-    if not os.path.isdir(plugins_root):
-        if enabled:
-            return {"status": "broken", "reason": "plugins.enabled is set but no plugins directory exists", "detail": plugins_root}
-        return {"status": "healthy", "reason": "no plugins directory", "detail": plugins_root}
+    # Collect every plugin the loader can see — the user dir *and* the bundled
+    # dir (with its category sub-layouts) — by both manifest name and key. This
+    # is what makes enabled bundled plugins (e.g. `disk-cleanup`,
+    # `kilocode-provider`) resolvable instead of being falsely flagged missing.
+    known: set[str] = set()
+    _collect_plugin_ids(plugins_root, "", 0, set(), known)
+    _collect_plugin_ids(_bundled_plugins_dir(), "", 0, {"memory", "context_engine"}, known)
 
     broken = []
     for name in sorted(enabled):
         if name in skip:
             continue  # sub-category dirs use their own selection keys, not plugins.enabled
-        pdir = os.path.join(plugins_root, name)
-        if not os.path.isdir(pdir):
-            broken.append(f"`{name}` is enabled but its directory is missing ({pdir})")
-        elif not os.path.isfile(os.path.join(pdir, "plugin.yaml")):
-            broken.append(f"`{name}` is enabled but has no plugin.yaml manifest")
+        if name not in known:
+            broken.append(f"`{name}` is enabled but no matching plugin manifest was found")
 
     notes = []
-    for name in sorted(os.listdir(plugins_root)):
-        if name in skip or name.startswith(".") or name == "__pycache__":
-            continue
-        if not os.path.isdir(os.path.join(plugins_root, name)):
-            continue
-        if name not in enabled and name not in disabled:
-            notes.append(f"`{name}` discovered but not enabled (opt-in)")
+    if os.path.isdir(plugins_root):
+        for name in sorted(os.listdir(plugins_root)):
+            if name in skip or name.startswith(".") or name == "__pycache__":
+                continue
+            if not os.path.isdir(os.path.join(plugins_root, name)):
+                continue
+            if name not in enabled and name not in disabled:
+                notes.append(f"`{name}` discovered but not enabled (opt-in)")
 
     if broken:
         return {"status": "broken", "reason": f"{len(broken)} enabled plugin(s) missing or broken", "detail": broken + notes}
