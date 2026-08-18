@@ -122,13 +122,20 @@ def _as_name_set(value):
     """Normalize a config value (list or scalar string) into a set of names.
 
     Guards against a scalar ``plugins.enabled: my-plugin`` — ``set("my-plugin")``
-    would explode into single characters and produce bogus findings.
+    would explode into single characters and produce bogus findings. Non-list,
+    non-string values (bool/int/float/dict) are ignored, mirroring Hermes's
+    list-only ``plugins.enabled`` handling instead of crashing on ``set(True)``.
     """
     if value is None:
         return set()
     if isinstance(value, str):
         return {value}
-    return set(value)
+    if isinstance(value, (list, tuple, set, frozenset)):
+        # Keep only string names: malformed entries (dicts, ints, ...) must not
+        # reach set()/sorted() and crash the diagnostic.
+        return {v for v in value if isinstance(v, str)}
+    # bool/int/float/dict/… are ignored (Hermes requires a list for `enabled`).
+    return set()
 
 
 # Slug normalization — identical to Hermes agent/skill_bundles.py::_slugify and
@@ -159,6 +166,27 @@ def check_config_parses():
 
 # --- MCP ------------------------------------------------------------------
 
+def _parse_enabled(value, default=True):
+    """Mirror Hermes hermes_cli/tools_config.py::_parse_enabled_flag.
+
+    Hermes treats ``enabled: false``, ``"false"``, ``"no"``, ``"off"``, and ``0``
+    as disabled; matching this avoids flagging disabled servers as broken.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value != 0
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes", "on"}:
+            return True
+        if lowered in {"false", "0", "no", "off"}:
+            return False
+    return default
+
+
 def check_mcp_servers_shape():
     path, data = _read_config()
     if not path or data is None:
@@ -174,14 +202,17 @@ def check_mcp_servers_shape():
                 f"foreign key `{key}` present (silently not read; use `{constants.CONFIG_MCP_SERVERS}`)"
             )
 
-    servers = data.get(constants.CONFIG_MCP_SERVERS) or {}
+    servers = data.get(constants.CONFIG_MCP_SERVERS)
+    if servers is None:
+        servers = {}
     if isinstance(servers, dict):
         for name, entry in servers.items():
             if not isinstance(entry, dict):
                 broken.append(f"`{constants.CONFIG_MCP_SERVERS}.{name}` is not a mapping")
                 continue
-            if entry.get("enabled") is False:
-                notes.append(f"`{constants.CONFIG_MCP_SERVERS}.{name}` is `enabled: false` (skipped)")
+            if not _parse_enabled(entry.get("enabled")):
+                notes.append(f"`{constants.CONFIG_MCP_SERVERS}.{name}` is disabled (skipped)")
+                continue
             if not entry.get(constants.MCP_STDIO_KEY) and not entry.get(constants.MCP_HTTP_KEY):
                 broken.append(
                     f"`{constants.CONFIG_MCP_SERVERS}.{name}` has neither "
@@ -234,14 +265,23 @@ def check_commands():
         return {"status": "unknown", "reason": "cannot resolve $HERMES_HOME", "detail": None}
 
     skill_slugs = set()
-    for _dirpath, fm in _iter_skills():
+    skill_slug_owners: dict[str, str] = {}  # slug -> first skill dir (first-wins, mirrors Hermes)
+    collisions = []
+    for dirpath, fm in _iter_skills():
         if fm and fm.get("name"):
             s = _bundle_slug(fm.get("name"))
             if s:
                 skill_slugs.add(s)
+                if s in skill_slug_owners:
+                    collisions.append(
+                        f"skill `{os.path.basename(skill_slug_owners[s])}` and "
+                        f"`{os.path.basename(dirpath)}` both normalize to `/{s}` (first wins)"
+                    )
+                else:
+                    skill_slug_owners[s] = dirpath
 
-    collisions = []
     malformed = []
+    bundle_slugs: dict[str, str] = {}  # slug -> first bundle stem (bundle-vs-bundle first-wins)
     bundles_root = os.path.join(home, "skill-bundles")
     if os.path.isdir(bundles_root):
         for fn in sorted(os.listdir(bundles_root)):
@@ -278,14 +318,22 @@ def check_commands():
                 malformed.append(f"bundle `{stem}` yields an empty slug (skipped by Hermes)")
                 continue
 
+            if slug in bundle_slugs:
+                collisions.append(
+                    f"bundle `{stem}` (/{slug}) shadows bundle "
+                    f"`{bundle_slugs[slug]}` (/{slug}) (first wins)"
+                )
+            else:
+                bundle_slugs[slug] = stem
+
             if slug in skill_slugs:
                 collisions.append(f"bundle `{stem}` (/{slug}) shadows skill `/{slug}` (bundle wins)")
 
     if malformed:
         return {"status": "broken", "reason": f"{len(malformed)} malformed bundle(s)", "detail": malformed + collisions}
     if collisions:
-        return {"status": "informational", "reason": f"{len(collisions)} bundle/skill slug collision(s)", "detail": collisions}
-    return {"status": "healthy", "reason": "no bundle/skill slug collisions or malformed bundles", "detail": None}
+        return {"status": "informational", "reason": f"{len(collisions)} slug collision(s)", "detail": collisions}
+    return {"status": "healthy", "reason": "no slug collisions or malformed bundles", "detail": None}
 
 
 # --- hooks ----------------------------------------------------------------
@@ -344,7 +392,7 @@ def check_plugins():
 
     notes = []
     for name in sorted(os.listdir(plugins_root)):
-        if name in skip or name.startswith("."):
+        if name in skip or name.startswith(".") or name == "__pycache__":
             continue
         if not os.path.isdir(os.path.join(plugins_root, name)):
             continue
