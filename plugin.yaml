@@ -3,7 +3,7 @@ version: 0.1.0
 description: >-
   Executable, read-only diagnostics for Hermes configuration. Runs deterministic
   health checks across MCP servers, skills, commands, hooks, and plugins.
-manifest_version: 2
+manifest_version: 1
 api_version: 1
 license: MIT
 homepage: https://github.com/iap/hermes-guide
