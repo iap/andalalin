@@ -182,6 +182,8 @@ _BUNDLE_MULTI_HYPHEN = re.compile(r"-{2,}")
 
 def _bundle_slug(name):
     """Normalize a skill/bundle name to the hyphenated slash-command slug."""
+    if not isinstance(name, str):
+        return ""
     cmd = name.lower().replace(" ", "-").replace("_", "-")
     cmd = _BUNDLE_INVALID_CHARS.sub("", cmd)
     return _BUNDLE_MULTI_HYPHEN.sub("-", cmd).strip("-")
@@ -571,7 +573,7 @@ def check_plugins():
     # `kilocode-provider`) resolvable instead of being falsely flagged missing.
     known: set[str] = set()
     _collect_plugin_ids(plugins_root, "", 0, set(), known)
-    _collect_plugin_ids(_bundled_plugins_dir(), "", 0, {"memory", "context_engine"}, known)
+    _collect_plugin_ids(_bundled_plugins_dir(), "", 0, {"memory", "context_engine", "model-providers"}, known)
 
     broken = []
     for name in sorted(enabled):
