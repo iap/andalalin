@@ -284,7 +284,7 @@ def _builtin_command_names():
     silently skipped rather than false-positives.
     """
     try:
-        from hermes_cli.commands import COMMAND_REGISTRY
+        from hermes_cli.commands import COMMAND_REGISTRY  # type: ignore[import-not-found]
 
         names = set()
         for cmd in COMMAND_REGISTRY:
