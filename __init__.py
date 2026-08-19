@@ -4,9 +4,6 @@ Exposes:
   - `/hermes-doctor`  slash command  (CLI + gateway sessions)
   - `hermes guide <scope>`  CLI subcommand  (terminal; exit 1 on broken)
 
-Also bundles the six troubleshooting skills under the `hermes-guide:` namespace
-(read-only reference; opt-in explicit loads, not in the system prompt index).
-
 Checks: config, mcp, skills, commands, hooks, plugins. The full ~30-check catalog
 layers on top of `checks.py`.
 
@@ -15,15 +12,11 @@ findings (observer-only; nothing is injected or modified).
 """
 
 import logging
-import pathlib
-import re
 import sys
 
 from . import checks
 
 logger = logging.getLogger(__name__)
-
-_BASE = pathlib.Path(__file__).resolve().parent
 
 
 def _format_result(results):
@@ -51,32 +44,6 @@ def _format_result(results):
             elif status != "healthy":
                 lines.append(f"    - {detail}")
     return exit_ok, "\n".join(lines) if lines else "(no checks)"
-
-
-def _skill_meta(skill_md):
-    """Return (name, description) from a SKILL.md frontmatter, or (None, "")."""
-    fm = checks.frontmatter(skill_md)
-    if not fm:
-        return None, ""
-    return fm.get("name"), fm.get("description", "")
-
-
-def _register_skills(ctx):
-    """Bundle the reference skills under the `hermes-guide:` namespace."""
-    skills_root = _BASE / "skills"
-    if not skills_root.is_dir():
-        return
-    for skill_dir in sorted(skills_root.iterdir()):
-        skill_md = skill_dir / "SKILL.md"
-        if not skill_md.is_file():
-            continue
-        name, description = _skill_meta(skill_md)
-        if not name or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
-            name = skill_dir.name
-        try:
-            ctx.register_skill(name, skill_md, description=description)
-        except Exception as exc:  # a broken skill must not kill the plugin
-            logger.warning("hermes-guide: skip skill %r: %s", name, exc)
 
 
 def _handle_doctor(raw_args):
@@ -115,7 +82,6 @@ def _proactive_check(**_kwargs):
 
 
 def register(ctx):
-    _register_skills(ctx)
     ctx.register_command(
         "hermes-doctor",
         handler=_handle_doctor,

@@ -52,7 +52,9 @@ Drift findings are then logged at session start/end — watch `hermes logs --fol
 
 ## Install the skills (tap)
 
-Add this repo as a skills tap, then install what you want:
+Installing the plugin (above) does **not** list or install the skills — they ship
+as separate, opt-in reference material. To make them appear under `hermes skills`,
+add this repo as a skills tap, then install what you want:
 
 ```bash
 hermes skills tap add iap/hermes-guide
