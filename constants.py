@@ -30,5 +30,7 @@ PLUGIN_SUBCATEGORY_DIRS = (
     "web",
     "browser",
     "cron_providers",
-    "observability",
+    # NOT "observability" — observability plugins are `standalone` and gated by
+    # plugins.enabled (namespaced keys like `observability/langfuse`), not an
+    # own provider key.
 )
