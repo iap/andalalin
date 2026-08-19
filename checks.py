@@ -298,12 +298,12 @@ def check_skills():
     bundled = _bundled_skill_names()
     for dirpath, fm in _iter_skills():
         seen += 1
-        # Identify by the declared name (what Hermes keys the manifest on),
-        # not the basename: two skills at different depths can share a
-        # basename, so basename matching would mislabel a nested user skill
-        # as Hermes-bundled. Basename is only a fallback when frontmatter
-        # is unreadable.
-        name = fm.get("name") if fm else os.path.basename(dirpath)
+        # Label [bundled] only from the skill's declared name (what Hermes
+        # keys the manifest on). The directory basename is not reliable
+        # ownership evidence — two skills at different depths can share a
+        # basename — so an unreadable/nameless skill is never inferred to be
+        # bundled.
+        name = fm.get("name") if fm else None
         tag = " [bundled]" if name in bundled else ""
         if fm is None:
             findings.append(f"{dirpath}: SKILL.md has no valid frontmatter{tag}")

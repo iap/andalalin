@@ -6,11 +6,11 @@ Verifies three behaviors introduced for mixed bundled/user skill libraries:
 1. Hidden/archive directories (``.archive``, ``.curator_backups``, ``.hub``)
    are skipped by ``_iter_skills``, so archived/backup skill copies never
    produce false positives.
-2. ``check_skills`` labels Hermes-bundled skills (tracked in
-   ``.bundled_manifest``) with ``[bundled]``, separating user-fixable issues
-   from Hermes-managed ones — matched by the skill's declared ``name`` (not
-   the directory basename), so a nested user skill that merely shares a
-   basename with a bundled skill is not mislabeled.
+2. ``check_skills`` labels a skill ``[bundled]`` only from its declared
+   frontmatter ``name`` (what Hermes keys ``.bundled_manifest`` on). The
+   directory basename is never used as ownership evidence, so a nested or
+   unreadable user skill that merely shares a basename with a bundled skill
+   is not mislabeled.
 3. ``check_commands`` includes each skill's ``version`` in slug-collision
    messages, so a stale unversioned copy is distinguishable from a newer
    versioned one at a glance.
@@ -35,13 +35,17 @@ def _write(path: Path, content: str) -> None:
 
 
 def _build_home(root: Path) -> None:
-    _write(root / "skills/.bundled_manifest", "dogfood:abc123\nbundled-broken:def456\n")
+    _write(root / "skills/.bundled_manifest", "dogfood:abc123\nstub:def456\nweather:098fed\n")
+    # valid bundled skill (healthy control)
     _write(root / "skills/dogfood/SKILL.md", "---\nname: dogfood\ndescription: bundled skill\n---\nbody\n")
-    _write(root / "skills/bundled-broken/SKILL.md", "just text no frontmatter")
+    # unreadable skill whose basename matches a bundled name -> must NOT be [bundled]
+    _write(root / "skills/stub/SKILL.md", "just text no frontmatter")
+    # unreadable skill whose basename is not bundled -> no tag
     _write(root / "skills/user-broken/SKILL.md", "also no frontmatter")
-    # nested user skill whose basename collides with a bundled name but whose
-    # frontmatter has no `name` — the fix must NOT label this [bundled]
+    # nested user skill with no `name` but basename collides with bundled -> no tag
     _write(root / "skills/user-collection/dogfood/SKILL.md", "---\ndescription: user skill, no name\n---\nbody\n")
+    # declared name matches manifest but missing description -> [bundled]
+    _write(root / "skills/weather/SKILL.md", "---\nname: weather\n---\nbody\n")
     _write(root / "skills/foo/SKILL.md", "---\nname: foo\ndescription: old\n---\nold\n")
     _write(root / "skills/category/foo/SKILL.md", "---\nname: foo\ndescription: new\nversion: 1.2.0\n---\nnew\n")
     _write(root / "skills/.archive/foo-old/SKILL.md", "---\nname: foo\ndescription: archived\nversion: 0.1.0\n---\narchived\n")
@@ -68,27 +72,26 @@ def main(argv: list[str]) -> int:
 
         # (1) hidden/archive dirs are skipped
         walked = list(checks._iter_skills())
-        if len(walked) != 7:
-            failures.append(f"expected 7 skills (hidden .archive skipped), got {len(walked)}")
+        if len(walked) != 8:
+            failures.append(f"expected 8 skills (hidden .archive skipped), got {len(walked)}")
         if any(".archive" in d for d, _ in walked):
             failures.append("hidden .archive dir was not skipped")
 
-        # (2) bundled skills are labelled by declared name, not basename
+        # (2) bundled label comes only from declared name, never basename
         sr = checks.check_skills()
         sdetail = sr.get("detail") or []
-        if sr["status"] != "broken" or sr["reason"] != "3 skill issue(s)":
+        if sr["status"] != "broken" or sr["reason"] != "4 skill issue(s)":
             failures.append(f"check_skills unexpected: {sr['status']} - {sr['reason']}")
-        if not any("bundled-broken" in d and "[bundled]" in d for d in sdetail):
-            failures.append("bundled skill not labelled [bundled]")
+        # positive: declared name in manifest -> [bundled]
+        if not any("weather" in d and "[bundled]" in d for d in sdetail):
+            failures.append("declared-name bundled skill (weather) not labelled [bundled]")
+        # negative: basename matches manifest but no declared name -> NOT [bundled]
+        if any("stub" in d and "[bundled]" in d for d in sdetail):
+            failures.append("unreadable skill (stub) mislabelled [bundled] from basename")
+        if any("user-collection/dogfood" in d and "[bundled]" in d for d in sdetail):
+            failures.append("nameless nested skill mislabelled [bundled] from basename")
         if any("user-broken" in d and "[bundled]" in d for d in sdetail):
-            failures.append("user skill wrongly labelled [bundled]")
-        # the nested user skill shares basename `dogfood` with a bundled skill
-        # but has no declared `name`; it must NOT be labelled [bundled]
-        nested = [d for d in sdetail if "user-collection/dogfood" in d]
-        if not nested:
-            failures.append("nested user skill with no name not flagged")
-        elif "[bundled]" in nested[0]:
-            failures.append(f"nested user skill mislabelled [bundled]: {nested[0]}")
+            failures.append("unreadable user skill mislabelled [bundled]")
 
         # (3) collision messages carry versions and skip archived copies
         cr = checks.check_commands()
