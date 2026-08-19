@@ -169,7 +169,11 @@ def check_config_parses():
     if not os.path.exists(path):
         return {"status": "broken", "reason": "config file missing", "detail": path}
     if data is None:
-        return {"status": "broken", "reason": "config.yaml does not parse (or root is not a mapping)", "detail": None}
+        return {
+            "status": "broken",
+            "reason": "config.yaml does not parse (or root is not a mapping)",
+            "detail": path,
+        }
     return {"status": "healthy", "reason": "config.yaml parses", "detail": path}
 
 
@@ -272,8 +276,28 @@ def check_skills():
 
 # --- commands -------------------------------------------------------------
 
+def _builtin_command_names():
+    """Return the set of built-in slash-command names and aliases from Hermes core.
+
+    Best-effort: returns an empty set if the import fails (e.g. running outside
+    a live Hermes environment), in which case the builtin-collision check is
+    silently skipped rather than false-positives.
+    """
+    try:
+        from hermes_cli.commands import COMMAND_REGISTRY
+
+        names = set()
+        for cmd in COMMAND_REGISTRY:
+            names.add(cmd.name)
+            for alias in cmd.aliases or ():
+                names.add(alias)
+        return names
+    except Exception:
+        return set()
+
+
 def check_commands():
-    """Detect skill-bundle slug collisions and malformed bundle files."""
+    """Detect skill-bundle slug collisions, malformed bundle files, and builtin shadowing."""
     home = _hermes_home()
     if not home:
         return {"status": "unknown", "reason": "cannot resolve $HERMES_HOME", "detail": None}
@@ -293,6 +317,20 @@ def check_commands():
                     )
                 else:
                     skill_slug_owners[s] = dirpath
+
+    # Skill-vs-builtin collisions: a skill whose slug matches a built-in command
+    # name is silently shadowed (built-in wins). Surface this so the user can
+    # rename the skill before wondering why `/<name>` behaves unexpectedly.
+    builtin_names = _builtin_command_names()
+    if builtin_names:
+        for dirpath, fm in _iter_skills():
+            if fm and fm.get("name"):
+                s = _bundle_slug(fm.get("name"))
+                if s and s in builtin_names:
+                    collisions.append(
+                        f"skill `{_rel_path(dirpath, home)}` (/{s}) shadows a built-in command "
+                        f"(builtin wins — rename the skill or expect the builtin behavior)"
+                    )
 
     malformed = []
     bundle_slugs: dict[str, str] = {}  # slug -> first bundle stem (bundle-vs-bundle first-wins)
@@ -353,14 +391,37 @@ def check_commands():
 # --- hooks ----------------------------------------------------------------
 
 def check_hooks():
-    # `hermes hooks doctor` exits 0 even with problems, so we parse its output.
-    # But if the subprocess itself never ran (hermes missing, timeout), we must
-    # not report "healthy".
+    # `hermes hooks doctor` exits 0 even with problems, so we parse its output
+    # (rc is not a reliable signal — it is 0 in all cases). Count the ✗/⚠ markers
+    # emitted per hook rather than matching the summary line's exact wording.
     rc, stdout, _ = _run(["hermes", "hooks", "doctor"], timeout=30)
     if rc != 0 or not stdout.strip():
-        return {"status": "unknown", "reason": f"`hermes hooks doctor` unavailable or failed (rc={rc})", "detail": None}
-    if "issue(s) found" in stdout:
-        return {"status": "broken", "reason": "`hermes hooks doctor` reported issues", "detail": stdout.strip()[:2000]}
+        return {
+            "status": "unknown",
+            "reason": f"`hermes hooks doctor` unavailable or failed (rc={rc})",
+            "detail": None,
+        }
+    if "No shell hooks configured" in stdout:
+        return {"status": "healthy", "reason": "no shell hooks configured", "detail": None}
+    # Count per-hook findings — ✗ and ⚠ are the only stable markers in the output.
+    import re as _re
+
+    markers = _re.findall(r"\s+[✗⚠]", stdout)
+    if markers:
+        return {
+            "status": "broken",
+            "reason": f"`hermes hooks doctor` reported {len(markers)} finding(s)",
+            "detail": stdout.strip()[:2000],
+        }
+    if "All shell hooks look healthy" in stdout:
+        return {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
+    # Output ran but matched no known summary pattern — treat as unknown rather
+    # than falsely healthy in case Hermes changed its wording.
+    return {
+        "status": "unknown",
+        "reason": "`hermes hooks doctor` output matched no known summary pattern",
+        "detail": stdout.strip()[:2000],
+    }
     # Verify the allowlist file is structurally sound, if present.
     home = _hermes_home()
     allowlist = os.path.join(home, "shell-hooks-allowlist.json") if home else None
@@ -369,7 +430,11 @@ def check_hooks():
             with open(allowlist, "r", encoding="utf-8") as f:
                 json.load(f)
         except Exception:
-            return {"status": "broken", "reason": "shell-hooks-allowlist.json is not valid JSON", "detail": allowlist}
+            return {
+                "status": "broken",
+                "reason": "shell-hooks-allowlist.json is not valid JSON",
+                "detail": allowlist,
+            }
     return {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
 
 

@@ -55,7 +55,7 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 
 - **Don't confuse Hermes with Claude Code or ZCode**. Hermes has no standalone command files (commands come from built-ins, skills-as-slash, bundles, and plugins). Hooks have four separate systems, not one. Plugins use `plugin.yaml` + `register(ctx)`, not `plugin.json`.
 - **Don't copy zcode-guide patterns blindly** — Hermes differs structurally (commands, hooks, and plugin format are all different).
-- **Don't guess hook event names**. There are 37 valid events in `hermes_cli/plugins.py:VALID_HOOKS`. Verify against the source.
+- **Don't guess hook event names**. The valid set lives in `hermes_cli/plugins.py:VALID_HOOKS` and grows across releases — verify against the installed source rather than a hardcoded count.
 
 ### Testing and validation
 

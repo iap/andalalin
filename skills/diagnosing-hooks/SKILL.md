@@ -1,7 +1,7 @@
 ---
 name: diagnosing-hooks
 description: Diagnose Hermes hooks that do not fire — gateway HOOK.yaml hooks, plugin hooks, shell hooks stuck on consent, and outbound webhooks — using hermes hooks doctor.
-version: 1.0.0
+version: 1.0.1
 metadata:
   hermes:
     tags: [hermes, hooks, troubleshooting]
@@ -19,7 +19,7 @@ Hermes has **four separate hook systems**. Most "my hook doesn't run" reports ar
 | **Shell hooks** | `hooks:` block in `config.yaml`, pointing at a script (convention: `$HERMES_HOME/agent-hooks/`) | CLI + gateway | Yes (same events as plugin hooks) |
 | **Outbound webhooks** | `hooks.outbound:` list in `config.yaml` | CLI + gateway | No — HTTP push only, response ignored |
 
-Valid hook-event names are the `VALID_HOOKS` set in `hermes_cli/plugins.py` (37 events in v0.20.x: `pre_tool_call`, `post_tool_call`, `pre_llm_call`, `pre_verify`, `transform_*`, `on_session_*`, `subagent_*`, kanban observers, `gateway_platform_event`, `pre_command`, …). Gateway hooks use a **different** event vocabulary (`gateway:startup`, `session:start`, `session:end`, `session:reset`, `agent:start|step|end`, `command:*`, `reaction:*`).
+Valid hook-event names are the `VALID_HOOKS` set in `hermes_cli/plugins.py` (the count grows across releases — verify against the installed source rather than a hardcoded number). Gateway hooks use a **different** event vocabulary (`gateway:startup`, `session:start`, `session:end`, `session:reset`, `agent:start|step|end`, `command:*`, `reaction:*`).
 
 ## 1. Shell-hook essentials (the most common breakage)
 

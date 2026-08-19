@@ -54,6 +54,9 @@ jobs:
       - name: Read-only runtime smoke test
         run: python tools/test_readonly_runtime.py
 
+      - name: Skill version bump guard
+        run: python tools/check_skill_version_bump.py
+
       - name: Security lint (bandit)
         run: |
           pip install bandit

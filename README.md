@@ -24,7 +24,7 @@ hermes plugins install iap/hermes-guide --ref <40-char-SHA> --enable
 Alternatively, copy this repo into your Hermes plugins directory:
 
 ```bash
-# POSIX: $HERMES_HOME is ~/.hermes
+# POSIX / WSL: $HERMES_HOME is ~/.hermes
 cp -r . ~/.hermes/plugins/hermes-guide/
 hermes plugins enable hermes-guide
 ```
