@@ -105,18 +105,53 @@ def frontmatter(path):
 
 
 def _iter_skills():
-    """Yield (skill_dir_path, frontmatter_or_None) for every SKILL.md, cached."""
+    """Yield (skill_dir_path, frontmatter_or_None) for every SKILL.md, cached.
+
+    Skips hidden/archive directories (``.archive``, ``.curator_backups``,
+    ``.hub``) that Hermes uses for internal bookkeeping but does not load as
+    skills — mirroring the loader so archived/backup copies never produce
+    false positives.
+    """
     if "skills" not in _cache:
         home = _hermes_home()
         out = []
         if home:
             skills_root = os.path.join(home, "skills")
             if os.path.isdir(skills_root):
-                for dirpath, _dirnames, filenames in os.walk(skills_root):
+                for dirpath, dirnames, filenames in os.walk(skills_root):
+                    dirnames[:] = [d for d in dirnames if not d.startswith(".")]
                     if "SKILL.md" in filenames:
                         out.append((dirpath, frontmatter(os.path.join(dirpath, "SKILL.md"))))
         _cache["skills"] = out
     return _cache["skills"]
+
+
+def _bundled_skill_names():
+    """Return the set of Hermes-bundled skill names from ``.bundled_manifest``.
+
+    The manifest is Hermes' authoritative ``name:hash`` record of skills it
+    ships and updates. Skills in this set are Hermes-managed, so their issues
+    are not user-fixable (an update overwrites them) and are labelled
+    distinctly instead of prompting the user to edit them.
+    """
+    if "bundled_names" not in _cache:
+        home = _hermes_home()
+        names = set()
+        if home:
+            manifest = os.path.join(home, "skills", ".bundled_manifest")
+            if os.path.isfile(manifest):
+                try:
+                    with open(manifest, "r", encoding="utf-8") as f:
+                        for line in f:
+                            name = line.split(":", 1)[0].strip()
+                            if name:
+                                names.add(name)
+                except Exception:
+                    # Unreadable/malformed manifest — treat as empty (best-effort;
+                    # fail open toward user-actionable labels).
+                    names = set()
+        _cache["bundled_names"] = names
+    return _cache["bundled_names"]
 
 
 def _as_name_set(value):
@@ -260,14 +295,16 @@ def check_skills():
 
     findings = []
     seen = 0
+    bundled = _bundled_skill_names()
     for dirpath, fm in _iter_skills():
         seen += 1
+        tag = " [bundled]" if os.path.basename(dirpath) in bundled else ""
         if fm is None:
-            findings.append(f"{dirpath}: SKILL.md has no valid frontmatter")
+            findings.append(f"{dirpath}: SKILL.md has no valid frontmatter{tag}")
             continue
         for req in ("name", "description"):
             if not fm.get(req):
-                findings.append(f"{dirpath}: frontmatter missing `{req}`")
+                findings.append(f"{dirpath}: frontmatter missing `{req}`{tag}")
 
     if findings:
         return {"status": "broken", "reason": f"{len(findings)} skill issue(s)", "detail": findings}
@@ -304,6 +341,7 @@ def check_commands():
 
     skill_slugs = set()
     skill_slug_owners: dict[str, str] = {}  # slug -> first skill dir (first-wins, mirrors Hermes)
+    skill_slug_versions: dict[str, str] = {}  # slug -> version string of first owner
     collisions = []
     for dirpath, fm in _iter_skills():
         if fm and fm.get("name"):
@@ -311,12 +349,16 @@ def check_commands():
             if s:
                 skill_slugs.add(s)
                 if s in skill_slug_owners:
+                    first_v = skill_slug_versions.get(s) or "unversioned"
+                    this_v = str(fm.get("version") or "").strip() or "unversioned"
                     collisions.append(
-                        f"skill `{_rel_path(skill_slug_owners[s], home)}` and "
-                        f"`{_rel_path(dirpath, home)}` both normalize to `/{s}` (first wins)"
+                        f"skill `{_rel_path(skill_slug_owners[s], home)}` (v{first_v}) and "
+                        f"`{_rel_path(dirpath, home)}` (v{this_v}) both normalize to "
+                        f"`/{s}` (first wins)"
                     )
                 else:
                     skill_slug_owners[s] = dirpath
+                    skill_slug_versions[s] = str(fm.get("version") or "").strip()
 
     # Skill-vs-builtin collisions: a skill whose slug matches a built-in command
     # name is silently shadowed (built-in wins). Surface this so the user can

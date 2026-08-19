@@ -57,6 +57,9 @@ jobs:
       - name: Skill version bump guard
         run: python tools/check_skill_version_bump.py
 
+      - name: Skill-library behavioral test
+        run: python tools/test_skill_checks.py
+
       - name: Security lint (bandit)
         run: |
           pip install bandit
