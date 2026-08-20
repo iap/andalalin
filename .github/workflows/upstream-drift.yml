@@ -23,7 +23,6 @@ jobs:
       - name: Check upstream schema drift
         run: python3 tools/check_upstream_drift.py
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: *** secrets.GITHUB_TOKEN }}
           UPSTREAM_REPO: NousResearch/hermes-agent
           WATCH_FILES: hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py
-          DRIFT_WINDOW_DAYS: '7'

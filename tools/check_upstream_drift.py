@@ -1,88 +1,112 @@
 #!/usr/bin/env python3
-"""Detect upstream schema drift for the hermes-guide plugin.
+"""Detect upstream schema drift for the hermes-guide plugin (baseline-anchored).
 
-`checks.py` / `constants.py` encode knowledge of the Hermes schema that upstream
-owns: plugin subcategory dirs, skill frontmatter fields, MCP server fields, and hook
-event names. When `NousResearch/hermes-agent` changes the files that define that
-schema, this plugin can silently go stale.
+`checks.py` / `constants.py` encode knowledge of the Hermes schema that upstream owns:
+plugin subcategory dirs, skill frontmatter fields, MCP server fields, and hook event
+names. When `NousResearch/hermes-agent` changes the files that define that schema, this
+plugin can silently go stale.
 
-This script flags upstream commits (within the last N days) that touched the watched
-schema files, and files a GitHub issue on this repo so a human reviews the drift.
-Runs in CI via `.github/workflows/upstream-drift.yml` (weekly + manual).
+This script diffs the watched schema files between a stored baseline commit
+(`.github/upstream-drift.baseline`) and upstream HEAD, and files one GitHub issue on this
+repo listing the drift. It deduplicates (skips) if a drift issue is already open, and
+tells the reviewer to bump the baseline afterward. Runs in CI via
+`.github/workflows/upstream-drift.yml` (weekly + manual).
 
-Requires the `gh` CLI (preinstalled on GitHub-hosted runners) with a token that can
-read the public upstream repo and create issues on this repo.
+Requires `git` + the `gh` CLI (both preinstalled on GitHub-hosted runners).
 """
 
-import datetime
+import json
 import os
 import subprocess
 import sys
-from urllib.parse import urlencode
+from pathlib import Path
 
 UPSTREAM_REPO = os.environ.get("UPSTREAM_REPO", "NousResearch/hermes-agent")
 WATCH_FILES = os.environ.get(
     "WATCH_FILES",
     "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py",
 ).split()
-WINDOW_DAYS = int(os.environ.get("DRIFT_WINDOW_DAYS", "7"))
+BASELINE_FILE = Path(".github/upstream-drift.baseline")
+ISSUE_TITLE = "Upstream schema drift detected — review checks.py"
+CLONE_DIR = "/tmp/hermes-agent-upstream"
 
 
-def recent_commits(path: str, since: str) -> list[str]:
-    """Return SHAs of upstream commits touching `path` since `since` (ISO-8601)."""
-    query = urlencode({"path": path, "since": since}, safe="/")
-    proc = subprocess.run(
-        ["gh", "api", f"repos/{UPSTREAM_REPO}/commits?{query}", "--jq", ".[].sha"],
-        capture_output=True,
-        text=True,
+def read_baseline() -> str:
+    return BASELINE_FILE.read_text(encoding="utf-8").strip()
+
+
+def clone_upstream() -> str:
+    """Blobless partial clone of upstream `main` (fetches history, not file contents)."""
+    subprocess.run(["rm", "-rf", CLONE_DIR], check=False)
+    subprocess.run(
+        [
+            "git", "clone", "--filter=blob:none", "--no-checkout",
+            "--single-branch", "--branch", "main",
+            f"https://github.com/{UPSTREAM_REPO}.git", CLONE_DIR,
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
-    if proc.returncode != 0:
-        print(f"WARN: could not query {path}: {proc.stderr.strip()}", file=sys.stderr)
-        return []
-    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+    return CLONE_DIR
+
+
+def git(repo_dir: str, *args: str) -> tuple[str, str]:
+    proc = subprocess.run(["git", "-C", repo_dir, *args], capture_output=True, text=True)
+    return proc.stdout.strip(), proc.stderr.strip()
 
 
 def main() -> int:
-    since = (
-        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=WINDOW_DAYS)
-    ).isoformat()
+    base = read_baseline()
+    repo_dir = clone_upstream()
+    head, _ = git(repo_dir, "rev-parse", "HEAD")
 
-    touched: dict[str, list[str]] = {}
-    for path in WATCH_FILES:
-        shas = recent_commits(path, since)
-        if shas:
-            touched[path] = shas
+    log, err = git(repo_dir, "log", "--format=%h %ci %s", f"{base}..HEAD", "--", *WATCH_FILES)
+    if err and "unknown revision" in err:
+        print(
+            f"ERROR: baseline {base[:7]} not found upstream — please re-baseline "
+            f"`.github/upstream-drift.baseline`.",
+            file=sys.stderr,
+        )
+        return 1
 
-    if not touched:
-        print(f"No upstream schema changes in the last {WINDOW_DAYS} days.")
+    if not log:
+        print(f"No drift: watched files unchanged since baseline {base[:7]} (HEAD {head[:7]}).")
         return 0
 
-    lines = [f"## Upstream schema drift (last {WINDOW_DAYS} days)", ""]
-    for path, shas in touched.items():
-        lines.append(f"### `{path}`")
-        for sha in shas[:20]:
-            lines.append(f"- [`{sha[:7]}`](https://github.com/{UPSTREAM_REPO}/commit/{sha})")
-        lines.append("")
-    lines.append(
-        "These files define schema the `hermes-guide` plugin depends on (plugin "
-        "subcategory dirs, skill frontmatter, MCP server fields, hook event names). "
-        "Review the changes and update `checks.py` / `constants.py` if needed."
+    body = (
+        "## Upstream schema drift\n\n"
+        f"Watched files changed since baseline `{base[:7]}`:\n\n"
+        f"```\n{log}\n```\n\n"
+        f"Compare: https://github.com/{UPSTREAM_REPO}/compare/{base[:7]}...{head[:7]}\n\n"
+        "Review the changes and update `checks.py` / `constants.py` if needed. Then bump "
+        f"the baseline: edit `.github/upstream-drift.baseline` to `{head}`."
     )
-    body = "\n".join(lines)
 
-    issue_repo = os.environ.get("GITHUB_REPOSITORY", "")
-    if not issue_repo or os.environ.get("DRIFT_DRY_RUN") == "1":
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if not repo or os.environ.get("DRIFT_DRY_RUN") == "1":
         print("DRIFT DETECTED (dry-run, no issue opened):")
         print(body)
         return 0
 
-    subprocess.run(
+    # Dedup: skip if an open drift issue already exists.
+    proc = subprocess.run(
         [
-            "gh", "issue", "create",
-            "--repo", issue_repo,
-            "--title", "Upstream schema drift detected — review checks.py",
-            "--body", body,
+            "gh", "issue", "list", "--repo", repo, "--state", "open",
+            "--search", "Upstream schema drift", "--json", "number",
         ],
+        capture_output=True,
+        text=True,
+    )
+    try:
+        if json.loads(proc.stdout):
+            print("Drift issue already open; skipping duplicate.")
+            return 0
+    except json.JSONDecodeError:
+        pass
+
+    subprocess.run(
+        ["gh", "issue", "create", "--repo", repo, "--title", ISSUE_TITLE, "--body", body],
         check=True,
     )
     print("Opened drift issue.")
