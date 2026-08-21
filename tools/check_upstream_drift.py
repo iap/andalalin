@@ -89,11 +89,13 @@ def main() -> int:
         print(body)
         return 0
 
-    # Dedup: skip if an open drift issue already exists.
+    # Dedup: skip only if the canonical drift issue (exact title) is open. A
+    # broad substring match could otherwise let an unrelated issue suppress a
+    # real drift alert.
     proc = subprocess.run(
         [
             "gh", "issue", "list", "--repo", repo, "--state", "open",
-            "--search", "Upstream schema drift", "--json", "number",
+            "--search", "Upstream schema drift", "--json", "number,title",
         ],
         capture_output=True,
         text=True,
@@ -105,12 +107,14 @@ def main() -> int:
         )
         return 1
     try:
-        if json.loads(proc.stdout):
-            print("Drift issue already open; skipping duplicate.")
-            return 0
+        issues = json.loads(proc.stdout)
     except json.JSONDecodeError:
         print("ERROR: gh issue list returned invalid JSON.", file=sys.stderr)
         return 1
+
+    if any(i.get("title") == ISSUE_TITLE for i in issues):
+        print("Drift issue already open; skipping duplicate.")
+        return 0
 
     subprocess.run(
         ["gh", "issue", "create", "--repo", repo, "--title", ISSUE_TITLE, "--body", body],
