@@ -98,12 +98,19 @@ def main() -> int:
         capture_output=True,
         text=True,
     )
+    if proc.returncode != 0:
+        print(
+            f"ERROR: gh issue list failed: {proc.stderr.strip() or 'unknown error'}",
+            file=sys.stderr,
+        )
+        return 1
     try:
         if json.loads(proc.stdout):
             print("Drift issue already open; skipping duplicate.")
             return 0
     except json.JSONDecodeError:
-        pass
+        print("ERROR: gh issue list returned invalid JSON.", file=sys.stderr)
+        return 1
 
     subprocess.run(
         ["gh", "issue", "create", "--repo", repo, "--title", ISSUE_TITLE, "--body", body],
