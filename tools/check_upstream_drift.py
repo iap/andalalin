@@ -24,7 +24,8 @@ from pathlib import Path
 UPSTREAM_REPO = os.environ.get("UPSTREAM_REPO", "NousResearch/hermes-agent")
 WATCH_FILES = os.environ.get(
     "WATCH_FILES",
-    "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py",
+    "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py "
+    "skills/autonomous-ai-agents/hermes-agent",
 ).split()
 BASELINE_FILE = Path(".github/upstream-drift.baseline")
 ISSUE_TITLE = "Upstream schema drift detected — review checks.py"
