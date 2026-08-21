@@ -51,23 +51,23 @@ def clone_upstream() -> str:
     return CLONE_DIR
 
 
-def git(repo_dir: str, *args: str) -> tuple[str, str]:
+def git(repo_dir: str, *args: str) -> tuple[str, str, int]:
     proc = subprocess.run(["git", "-C", repo_dir, *args], capture_output=True, text=True)
-    return proc.stdout.strip(), proc.stderr.strip()
+    return proc.stdout.strip(), proc.stderr.strip(), proc.returncode
 
 
 def main() -> int:
     base = read_baseline()
     repo_dir = clone_upstream()
-    head, _ = git(repo_dir, "rev-parse", "HEAD")
+    head, _, _ = git(repo_dir, "rev-parse", "HEAD")
 
-    log, err = git(repo_dir, "log", "--format=%h %ci %s", f"{base}..HEAD", "--", *WATCH_FILES)
-    if err and "unknown revision" in err:
-        print(
-            f"ERROR: baseline {base[:7]} not found upstream — please re-baseline "
-            f"`.github/upstream-drift.baseline`.",
-            file=sys.stderr,
-        )
+    log, err, code = git(repo_dir, "log", "--format=%h %ci %s", f"{base}..HEAD", "--", *WATCH_FILES)
+    if code != 0:
+        if "unknown revision" in err:
+            msg = f"baseline {base[:7]} not found upstream — please re-baseline `.github/upstream-drift.baseline`."
+        else:
+            msg = f"git log failed: {err or 'unknown error'}"
+        print(f"ERROR: {msg}", file=sys.stderr)
         return 1
 
     if not log:
