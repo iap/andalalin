@@ -601,13 +601,21 @@ def check_plugins():
 
     notes = []
     if os.path.isdir(plugins_root):
-        for name in sorted(os.listdir(plugins_root)):
-            if name in skip or name.startswith(".") or name == "__pycache__":
+        for entry in sorted(os.listdir(plugins_root)):
+            if entry in skip or entry.startswith(".") or entry == "__pycache__":
                 continue
-            if not os.path.isdir(os.path.join(plugins_root, name)):
+            dpath = os.path.join(plugins_root, entry)
+            if not os.path.isdir(dpath):
                 continue
-            if name not in enabled and name not in disabled:
-                notes.append(f"`{name}` discovered but not enabled (opt-in)")
+            manifest_name = _read_plugin_manifest(dpath)
+            if manifest_name is None:
+                # No manifest — not a plugin. Hermes does not load it either, so
+                # reporting a stray state/vendor directory would be noise.
+                continue
+            # Match on the manifest name, which is what `plugins.enabled` keys
+            # on; the directory basename is not a reliable identifier.
+            if manifest_name not in enabled and manifest_name not in disabled:
+                notes.append(f"`{manifest_name}` discovered but not enabled (opt-in)")
 
     if broken:
         return {"status": "broken", "reason": f"{len(broken)} enabled plugin(s) missing or broken", "detail": broken + notes}
