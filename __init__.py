@@ -49,14 +49,22 @@ def _format_result(results):
 def _handle_doctor(raw_args):
     """`/hermes-doctor` handler — optional scope, e.g. `/hermes-doctor mcp`."""
     scope = raw_args.strip() or None
-    _, text = _format_result(checks.run_all(scope=scope))
+    try:
+        _, text = _format_result(checks.run_all(scope=scope))
+    except ValueError as exc:
+        # Slash commands have no exit-code contract; surface the error as text.
+        return f"error: {exc}"
     return text
 
 
 def _run_cli(args):
     """`hermes guide <scope>` handler."""
     scope = getattr(args, "scope", None)
-    exit_ok, text = _format_result(checks.run_all(scope=scope))
+    try:
+        exit_ok, text = _format_result(checks.run_all(scope=scope))
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
     print(text)
     sys.exit(0 if exit_ok else 1)
 
