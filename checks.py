@@ -643,16 +643,23 @@ _CHECKS = [
 
 
 def run_all(scope=None):
-    """Run every check; optionally filter by a scope substring (e.g. 'mcp').
+    """Run every check, or exactly the one named by ``scope``.
 
     Each check is isolated: a crash in one check surfaces as a `broken`
     envelope instead of aborting the whole report (a diagnostic tool must
     survive the broken inputs it exists to diagnose).
+
+    ``scope`` must equal one of the check labels. An unrecognized scope raises
+    ``ValueError`` naming the valid ones — matching on a substring would let
+    ``s`` silently run four checks and a typo report success.
     """
     _cache.clear()
+    valid = [label for label, _ in _CHECKS]
+    if scope is not None and scope not in valid:
+        raise ValueError(f"unknown scope {scope!r}; valid scopes: {', '.join(valid)}")
     results = {}
     for label, fn in _CHECKS:
-        if scope and scope not in label:
+        if scope is not None and scope != label:
             continue
         try:
             results[label] = fn()
