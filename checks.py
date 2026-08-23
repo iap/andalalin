@@ -590,7 +590,13 @@ def check_plugins():
     # `kilocode-provider`) resolvable instead of being falsely flagged missing.
     known: set[str] = set()
     _collect_plugin_ids(plugins_root, "", 0, set(), known)
-    _collect_plugin_ids(_bundled_plugins_dir(), "", 0, {"memory", "context_engine", "model-providers"}, known)
+    # Subcategory dirs resolve by their own selection keys (memory.provider,
+    # context.engine, image_gen.provider, --provider), never plugins.enabled, so
+    # their contents are not discoverable ids. Names come from constants.py,
+    # which is the single source of truth for values that drift upstream.
+    _collect_plugin_ids(
+        _bundled_plugins_dir(), "", 0, set(constants.PLUGIN_SUBCATEGORY_DIRS), known
+    )
 
     broken = []
     for name in sorted(enabled):
