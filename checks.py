@@ -440,6 +440,32 @@ def check_commands():
 
 # --- hooks ----------------------------------------------------------------
 
+def _check_allowlist_json():
+    """Return a broken envelope if ``shell-hooks-allowlist.json`` is present but
+    not valid JSON; otherwise ``None`` (no finding).
+
+    Independent of the ``hermes hooks doctor`` summary wording: a malformed
+    allowlist is broken even when doctor reports healthy or an unrecognized
+    summary.
+    """
+    home = _hermes_home()
+    if not home:
+        return None
+    allowlist = os.path.join(home, "shell-hooks-allowlist.json")
+    if not os.path.exists(allowlist):
+        return None
+    try:
+        with open(allowlist, "r", encoding="utf-8") as f:
+            json.load(f)
+    except Exception:
+        return {
+            "status": "broken",
+            "reason": "shell-hooks-allowlist.json is not valid JSON",
+            "detail": allowlist,
+        }
+    return None
+
+
 def check_hooks():
     # `hermes hooks doctor` exits 0 even with problems, so we parse its output
     # (rc is not a reliable signal — it is 0 in all cases). Count the ✗/⚠ markers
@@ -452,40 +478,31 @@ def check_hooks():
             "detail": None,
         }
     if "No shell hooks configured" in stdout:
-        return {"status": "healthy", "reason": "no shell hooks configured", "detail": None}
-    # Count per-hook findings — ✗ and ⚠ are the only stable markers in the output.
-    import re as _re
-
-    markers = _re.findall(r"\s+[✗⚠]", stdout)
-    if markers:
-        return {
-            "status": "broken",
-            "reason": f"`hermes hooks doctor` reported {len(markers)} finding(s)",
-            "detail": stdout.strip()[:2000],
-        }
-    if "All shell hooks look healthy" in stdout:
-        return {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
-    # Output ran but matched no known summary pattern — treat as unknown rather
-    # than falsely healthy in case Hermes changed its wording.
-    return {
-        "status": "unknown",
-        "reason": "`hermes hooks doctor` output matched no known summary pattern",
-        "detail": stdout.strip()[:2000],
-    }
-    # Verify the allowlist file is structurally sound, if present.
-    home = _hermes_home()
-    allowlist = os.path.join(home, "shell-hooks-allowlist.json") if home else None
-    if allowlist and os.path.exists(allowlist):
-        try:
-            with open(allowlist, "r", encoding="utf-8") as f:
-                json.load(f)
-        except Exception:
-            return {
+        result = {"status": "healthy", "reason": "no shell hooks configured", "detail": None}
+    else:
+        # ✗ and ⚠ are the only stable per-hook markers in the output.
+        markers = re.findall(r"\s+[✗⚠]", stdout)
+        if markers:
+            result = {
                 "status": "broken",
-                "reason": "shell-hooks-allowlist.json is not valid JSON",
-                "detail": allowlist,
+                "reason": f"`hermes hooks doctor` reported {len(markers)} finding(s)",
+                "detail": stdout.strip()[:2000],
             }
-    return {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
+        elif "All shell hooks look healthy" in stdout:
+            result = {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
+        else:
+            # Output ran but matched no known summary pattern — treat as unknown
+            # rather than falsely healthy in case Hermes changed its wording.
+            result = {
+                "status": "unknown",
+                "reason": "`hermes hooks doctor` output matched no known summary pattern",
+                "detail": stdout.strip()[:2000],
+            }
+    # A malformed allowlist is real breakage regardless of doctor's verdict.
+    allowlist_result = _check_allowlist_json()
+    if allowlist_result is not None:
+        return allowlist_result
+    return result
 
 
 # --- plugins --------------------------------------------------------------
