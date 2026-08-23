@@ -13,7 +13,7 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 | Path | Purpose |
 |---|---|
 | `plugin.yaml` | Plugin manifest (name, version, config schema) |
-| `__init__.py` | Plugin entrypoint — registers `/hermes-doctor`, `hermes guide`, and the six skills |
+| `__init__.py` | Plugin entrypoint — registers `/hermes-doctor` and `hermes guide` (the six skills ship separately via the skills tap) |
 | `checks.py` | The six read-only health checks (config/mcp/skills/commands/hooks/plugins) |
 | `constants.py` | Single source of truth for names/values that drift across Hermes versions |
 | `skills/*/SKILL.md` | The six skills (one map + five diagnostics) |
