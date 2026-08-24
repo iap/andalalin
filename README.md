@@ -34,7 +34,7 @@ On native Windows `$HERMES_HOME` is `%LOCALAPPDATA%\hermes` (not `~/.hermes`); r
 ## Usage
 
 - In a session: `/hermes-doctor` (all surfaces) or `/hermes-doctor mcp` (one surface).
-- In a terminal: `hermes guide` — exits `1` if any surface is broken.
+- In a terminal: `hermes guide` — exits `1` if any surface is broken or unknown (indeterminate).
 
 ### Proactive mode (opt-in)
 
