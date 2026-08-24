@@ -63,6 +63,18 @@ jobs:
       - name: Skill-library behavioral test
         run: python tools/test_skill_checks.py
 
+      - name: Hooks allowlist reachability regression
+        run: python tools/test_reachable_allowlist_check.py
+
+      - name: Plugin notes regression
+        run: python tools/test_plugins_notes.py
+
+      - name: Subcategory-dir constants regression
+        run: python tools/test_plugin_skip_source.py
+
+      - name: Scope validation regression
+        run: python tools/test_scope_validation.py
+
       - name: Security lint (bandit)
         run: |
           pip install bandit

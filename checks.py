@@ -440,6 +440,32 @@ def check_commands():
 
 # --- hooks ----------------------------------------------------------------
 
+def _check_allowlist_json():
+    """Return a broken envelope if ``shell-hooks-allowlist.json`` is present but
+    not valid JSON; otherwise ``None`` (no finding).
+
+    Independent of the ``hermes hooks doctor`` summary wording: a malformed
+    allowlist is broken even when doctor reports healthy or an unrecognized
+    summary.
+    """
+    home = _hermes_home()
+    if not home:
+        return None
+    allowlist = os.path.join(home, "shell-hooks-allowlist.json")
+    if not os.path.exists(allowlist):
+        return None
+    try:
+        with open(allowlist, "r", encoding="utf-8") as f:
+            json.load(f)
+    except Exception:
+        return {
+            "status": "broken",
+            "reason": "shell-hooks-allowlist.json is not valid JSON",
+            "detail": allowlist,
+        }
+    return None
+
+
 def check_hooks():
     # `hermes hooks doctor` exits 0 even with problems, so we parse its output
     # (rc is not a reliable signal — it is 0 in all cases). Count the ✗/⚠ markers
@@ -452,40 +478,31 @@ def check_hooks():
             "detail": None,
         }
     if "No shell hooks configured" in stdout:
-        return {"status": "healthy", "reason": "no shell hooks configured", "detail": None}
-    # Count per-hook findings — ✗ and ⚠ are the only stable markers in the output.
-    import re as _re
-
-    markers = _re.findall(r"\s+[✗⚠]", stdout)
-    if markers:
-        return {
-            "status": "broken",
-            "reason": f"`hermes hooks doctor` reported {len(markers)} finding(s)",
-            "detail": stdout.strip()[:2000],
-        }
-    if "All shell hooks look healthy" in stdout:
-        return {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
-    # Output ran but matched no known summary pattern — treat as unknown rather
-    # than falsely healthy in case Hermes changed its wording.
-    return {
-        "status": "unknown",
-        "reason": "`hermes hooks doctor` output matched no known summary pattern",
-        "detail": stdout.strip()[:2000],
-    }
-    # Verify the allowlist file is structurally sound, if present.
-    home = _hermes_home()
-    allowlist = os.path.join(home, "shell-hooks-allowlist.json") if home else None
-    if allowlist and os.path.exists(allowlist):
-        try:
-            with open(allowlist, "r", encoding="utf-8") as f:
-                json.load(f)
-        except Exception:
-            return {
+        result = {"status": "healthy", "reason": "no shell hooks configured", "detail": None}
+    else:
+        # ✗ and ⚠ are the only stable per-hook markers in the output.
+        markers = re.findall(r"\s+[✗⚠]", stdout)
+        if markers:
+            result = {
                 "status": "broken",
-                "reason": "shell-hooks-allowlist.json is not valid JSON",
-                "detail": allowlist,
+                "reason": f"`hermes hooks doctor` reported {len(markers)} finding(s)",
+                "detail": stdout.strip()[:2000],
             }
-    return {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
+        elif "All shell hooks look healthy" in stdout:
+            result = {"status": "healthy", "reason": "hooks doctor passed", "detail": None}
+        else:
+            # Output ran but matched no known summary pattern — treat as unknown
+            # rather than falsely healthy in case Hermes changed its wording.
+            result = {
+                "status": "unknown",
+                "reason": "`hermes hooks doctor` output matched no known summary pattern",
+                "detail": stdout.strip()[:2000],
+            }
+    # A malformed allowlist is real breakage regardless of doctor's verdict.
+    allowlist_result = _check_allowlist_json()
+    if allowlist_result is not None:
+        return allowlist_result
+    return result
 
 
 # --- plugins --------------------------------------------------------------
@@ -573,7 +590,13 @@ def check_plugins():
     # `kilocode-provider`) resolvable instead of being falsely flagged missing.
     known: set[str] = set()
     _collect_plugin_ids(plugins_root, "", 0, set(), known)
-    _collect_plugin_ids(_bundled_plugins_dir(), "", 0, {"memory", "context_engine", "model-providers"}, known)
+    # Subcategory dirs resolve by their own selection keys (memory.provider,
+    # context.engine, image_gen.provider, --provider), never plugins.enabled, so
+    # their contents are not discoverable ids. Names come from constants.py,
+    # which is the single source of truth for values that drift upstream.
+    _collect_plugin_ids(
+        _bundled_plugins_dir(), "", 0, set(constants.PLUGIN_SUBCATEGORY_DIRS), known
+    )
 
     broken = []
     for name in sorted(enabled):
@@ -584,13 +607,21 @@ def check_plugins():
 
     notes = []
     if os.path.isdir(plugins_root):
-        for name in sorted(os.listdir(plugins_root)):
-            if name in skip or name.startswith(".") or name == "__pycache__":
+        for entry in sorted(os.listdir(plugins_root)):
+            if entry in skip or entry.startswith(".") or entry == "__pycache__":
                 continue
-            if not os.path.isdir(os.path.join(plugins_root, name)):
+            dpath = os.path.join(plugins_root, entry)
+            if not os.path.isdir(dpath):
                 continue
-            if name not in enabled and name not in disabled:
-                notes.append(f"`{name}` discovered but not enabled (opt-in)")
+            manifest_name = _read_plugin_manifest(dpath)
+            if manifest_name is None:
+                # No manifest — not a plugin. Hermes does not load it either, so
+                # reporting a stray state/vendor directory would be noise.
+                continue
+            # Match on the manifest name, which is what `plugins.enabled` keys
+            # on; the directory basename is not a reliable identifier.
+            if manifest_name not in enabled and manifest_name not in disabled:
+                notes.append(f"`{manifest_name}` discovered but not enabled (opt-in)")
 
     if broken:
         return {"status": "broken", "reason": f"{len(broken)} enabled plugin(s) missing or broken", "detail": broken + notes}
@@ -612,16 +643,23 @@ _CHECKS = [
 
 
 def run_all(scope=None):
-    """Run every check; optionally filter by a scope substring (e.g. 'mcp').
+    """Run every check, or exactly the one named by ``scope``.
 
     Each check is isolated: a crash in one check surfaces as a `broken`
     envelope instead of aborting the whole report (a diagnostic tool must
     survive the broken inputs it exists to diagnose).
+
+    ``scope`` must equal one of the check labels. An unrecognized scope raises
+    ``ValueError`` naming the valid ones — matching on a substring would let
+    ``s`` silently run four checks and a typo report success.
     """
     _cache.clear()
+    valid = [label for label, _ in _CHECKS]
+    if scope is not None and scope not in valid:
+        raise ValueError(f"unknown scope {scope!r}; valid scopes: {', '.join(valid)}")
     results = {}
     for label, fn in _CHECKS:
-        if scope and scope not in label:
+        if scope is not None and scope != label:
             continue
         try:
             results[label] = fn()

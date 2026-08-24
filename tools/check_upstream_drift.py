@@ -17,6 +17,7 @@ Requires `git` + the `gh` CLI (both preinstalled on GitHub-hosted runners).
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,11 +25,32 @@ from pathlib import Path
 UPSTREAM_REPO = os.environ.get("UPSTREAM_REPO", "NousResearch/hermes-agent")
 WATCH_FILES = os.environ.get(
     "WATCH_FILES",
-    "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py",
+    "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py "
+    "skills/autonomous-ai-agents/hermes-agent",
 ).split()
 BASELINE_FILE = Path(".github/upstream-drift.baseline")
 ISSUE_TITLE = "Upstream schema drift detected — review checks.py"
 CLONE_DIR = "/tmp/hermes-agent-upstream"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+import constants  # noqa: E402  (repo-root single source of truth)
+
+# Facts that drift across Hermes versions. Each tuple: (label, upstream path,
+# extraction regex with one capture group, the hermes-guide constant asserting
+# ground truth). The watched files above cover *schema* drift; this covers *fact*
+# drift in files we intentionally do not watch whole (mcp_tool.py, config.py).
+DRIFT_FACTS = [
+    ("MCP tool-name prefix", "tools/mcp_tool.py",
+     r'MCP_TOOL_NAME_PREFIX\s*=\s*"([^"]+)"', constants.MCP_TOOL_NAME_PREFIX),
+    ("MCP per-tool-call timeout default (s)", "tools/mcp_tool.py",
+     r'per-tool-call timeout in seconds \(default:\s*(\d+)\)', str(constants.MCP_TIMEOUT_DEFAULT)),
+    ("MCP connect_timeout default (s)", "tools/mcp_tool.py",
+     r'_DEFAULT_CONNECT_TIMEOUT\s*=\s*(\d+)', str(constants.MCP_CONNECT_TIMEOUT_DEFAULT)),
+    ("MCP config key", "hermes_cli/config.py",
+     r'"(mcp_servers)"', constants.CONFIG_MCP_SERVERS),
+]
 
 
 def read_baseline() -> str:
@@ -56,6 +78,29 @@ def git(repo_dir: str, *args: str) -> tuple[str, str, int]:
     return proc.stdout.strip(), proc.stderr.strip(), proc.returncode
 
 
+def verify_facts(repo_dir: str, head: str) -> list[str]:
+    """Extract each watched fact from upstream HEAD and flag any mismatch."""
+    mismatches = []
+    for label, path, pattern, expected in DRIFT_FACTS:
+        content, err, code = git(repo_dir, "show", f"{head}:{path}")
+        if code != 0:
+            mismatches.append(
+                f"{label}: could not read upstream {path} ({err or 'unknown error'})"
+            )
+            continue
+        m = re.search(pattern, content)
+        if not m:
+            mismatches.append(f"{label}: pattern not found in upstream {path}")
+            continue
+        actual = m.group(1)
+        if actual != expected:
+            mismatches.append(
+                f"{label}: upstream now `{actual}`, hermes-guide asserts `{expected}` "
+                "(update constants.py and the matching SKILL.md)"
+            )
+    return mismatches
+
+
 def main() -> int:
     base = read_baseline()
     repo_dir = clone_upstream()
@@ -70,18 +115,32 @@ def main() -> int:
         print(f"ERROR: {msg}", file=sys.stderr)
         return 1
 
-    if not log:
-        print(f"No drift: watched files unchanged since baseline {base[:7]} (HEAD {head[:7]}).")
+    fact_mismatches = verify_facts(repo_dir, head)
+
+    if not log and not fact_mismatches:
+        print(
+            f"No drift: watched files unchanged and facts verified since baseline "
+            f"{base[:7]} (HEAD {head[:7]})."
+        )
         return 0
 
-    body = (
-        "## Upstream schema drift\n\n"
-        f"Watched files changed since baseline `{base[:7]}`:\n\n"
-        f"```\n{log}\n```\n\n"
+    sections = []
+    if log:
+        sections.append(
+            "## Schema drift\n\n"
+            f"Watched files changed since baseline `{base[:7]}`:\n\n"
+            f"```\n{log}\n```"
+        )
+    if fact_mismatches:
+        sections.append(
+            "## Fact drift\n\n" + "\n".join(f"- {m}" for m in fact_mismatches)
+        )
+    sections.append(
         f"Compare: https://github.com/{UPSTREAM_REPO}/compare/{base[:7]}...{head[:7]}\n\n"
-        "Review the changes and update `checks.py` / `constants.py` if needed. Then bump "
-        f"the baseline: edit `.github/upstream-drift.baseline` to `{head}`."
+        "Review the changes and update `checks.py` / `constants.py` / the SKILL.md files "
+        f"as needed. Then bump the baseline: edit `.github/upstream-drift.baseline` to `{head}`."
     )
+    body = "\n\n".join(sections)
 
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     if not repo or os.environ.get("DRIFT_DRY_RUN") == "1":
