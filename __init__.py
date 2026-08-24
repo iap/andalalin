@@ -2,7 +2,7 @@
 
 Exposes:
   - `/hermes-doctor`  slash command  (CLI + gateway sessions)
-  - `hermes hermes-guide <scope>`  CLI subcommand  (terminal; `--ci` exit code)
+  - `hermes guide <scope>`  CLI subcommand  (terminal; exit 1 on broken)
 
 Checks: config, mcp, skills, commands, hooks, plugins — six read-only checks
 implemented in `checks.py`.
