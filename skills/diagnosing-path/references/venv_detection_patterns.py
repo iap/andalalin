@@ -91,7 +91,10 @@ def activate_venv_command(venv_path: Path) -> str:
     if sys.platform == "win32":
         return f"{venv_path / 'Scripts' / 'activate.bat'}"
     else:
-        return f"source {venv_path / 'bin' / 'activate'}"
+        # Quote the path to handle spaces and shell metacharacters safely
+        import shlex
+        activate = venv_path / "bin" / "activate"
+        return f"source {shlex.quote(str(activate))}"
 
 
 def probe_shell() -> Optional[Path]:
@@ -112,7 +115,7 @@ if __name__ == "__main__":
     print(f"In venv: {is_venv_active()}")
     print(f"Active venv: {active_venv_path()}")
     
-    root = Path.cwd()
+    root = Path("/Users/iap/.hermes/hermes-agent")
     print(f"\nProject root: {root}")
     print(f"Venv dirs found: {find_venv_dirs(root)}")
     print(f"Resolved venv: {resolve_venv(root)}")
@@ -121,3 +124,8 @@ if __name__ == "__main__":
     if venv:
         print(f"Bin dir: {venv_bin_dir(venv)}")
         print(f"Python: {venv_python_path(venv)}")
+        print(f"Activate: {activate_venv_command(venv)}")
+    
+    # Verify quoting works for paths with spaces
+    test_venv = Path("/tmp/test path/venv")
+    print(f"\nQuoted activate (space in path): {activate_venv_command(test_venv)}")
