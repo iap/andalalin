@@ -31,6 +31,7 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 ### Authoring skills
 
 - Each skill lives in its own directory under `skills/<name>/SKILL.md`.
+- **Naming convention**: `diagnosing-<surface>` for diagnostic skills (e.g. `diagnosing-mcp`, `diagnosing-path`). The `hermes-` prefix is reserved for the configuration map skill. Keep names kebab-case, lowercase, ≤20 characters.
 - Frontmatter requires `name` (slug), `description` (keep it short), and `version` (semver).
 - Content must be **verified against the installed Hermes source** (the local checkout or install location) — specifically `website/docs/` for documentation and `hermes_cli/` / `agent/` / `hermes_constants.py` for source truth. Do not rely solely on web search; the installed copy is authoritative for the version in use.
 - Hermes configuration is **YAML** (`config.yaml`), not JSON. Never reference JSON config syntax.
@@ -56,7 +57,7 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 - **Don't confuse Hermes with Claude Code or ZCode**. Hermes has no standalone command files (commands come from built-ins, skills-as-slash, bundles, and plugins). Hooks have four separate systems, not one. Plugins use `plugin.yaml` + `register(ctx)`, not `plugin.json`.
 - **Don't copy zcode-guide patterns blindly** — Hermes differs structurally (commands, hooks, and plugin format are all different).
 - **Don't guess hook event names**. The valid set lives in `hermes_cli/plugins.py:VALID_HOOKS` and grows across releases — verify against the installed source rather than a hardcoded count.
-- **Don't hardcode `venv/` paths**. The project uses `.venv` as the canonical venv name (uv's default); `venv` is a legacy fallback. Both can coexist — `.venv` wins. See the `venv-guide` skill for detection patterns, canonical resolution order, and cross-platform best practices.
+- **Don't hardcode `venv/` paths**. The project uses `.venv` as the canonical venv name (uv's default); `venv` is a legacy fallback. Both can coexist — `.venv` wins. See the `diagnosing-path` skill for detection patterns, canonical resolution order, and cross-platform best practices.
 ### Testing and validation
 
 There is no unit-test suite yet; CI enforces a syntax check and a plugin self-check. Before declaring work complete:

@@ -1,16 +1,16 @@
 ---
-name: venv-guide
-description: "Guide to Hermes Agent's dual-venv layout — how the .venv/venv split happens, how to detect which venv is active, the canonical resolution order, and best practices for code, scripts, and documentation that reference the venv."
+name: diagnosing-path
+description: "Diagnose Hermes Agent path issues — the dual-venv layout (.venv/venv), how to detect which venv is active, the canonical resolution order, and best practices for code, scripts, and documentation that reference paths."
 version: 1.0.0
 metadata:
   hermes:
-    tags: [hermes, venv, python, troubleshooting, guide]
+    tags: [hermes, path, venv, python, troubleshooting, guide]
     category: guide
 ---
 
-# Hermes Agent Virtual Environment Guide
+# Hermes Agent Path Diagnostics
 
-This guide explains the dual-venv layout in Hermes Agent, how to detect which virtual environment is active, and the canonical resolution order. It applies to any code, script, or documentation that needs to reference the Hermes Agent venv.
+This guide explains the dual-venv layout in Hermes Agent, how to detect which virtual environment is active, and the canonical resolution order. It applies to any code, script, or documentation that needs to reference paths in a Hermes Agent checkout.
 
 ## The Situation
 

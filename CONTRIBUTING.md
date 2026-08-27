@@ -21,6 +21,12 @@ Short-lived branches, prefixed by type. Branch → merge to `master` → delete;
 
 Add a new prefix only when you actually need it (`docs/`, `chore/`, …).
 
+## Skill naming convention
+
+- `diagnosing-<surface>` for diagnostic skills (e.g. `diagnosing-mcp`, `diagnosing-path`).
+- `hermes-` prefix reserved for the configuration map skill (`hermes-configuration-guide`).
+- Kebab-case, lowercase, ≤20 characters.
+
 ## Pull Requests
 
 1. Fork the repository.

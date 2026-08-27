@@ -79,7 +79,7 @@ Each installed skill is also available as a slash command (e.g. `/hermes-configu
 | `diagnosing-commands` | Missing or overridden slash commands — skills-as-commands, bundles, plugin commands, per-platform permissions |
 | `diagnosing-hooks` | Hooks that don't fire — the four hook systems, shell-hook consent, `hermes hooks doctor` |
 | `diagnosing-plugins` | Plugins that don't load — the `plugins.enabled` gate, capability consent, discovery locations |
-| `venv-guide` | The dual-venv layout — how `.venv/` and `venv/` coexist, detection, canonical resolution order, cross-platform best practices |
+| `diagnosing-path` | Path issues — the dual-venv layout (.venv/venv), detection, canonical resolution order, cross-platform best practices |
 
 ## Design principle
 
