@@ -5,7 +5,7 @@
 Hermes usage and self-diagnosis guide for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It ships two things:
 
 1. **A plugin** — `/hermes-doctor` (in-session) and `hermes guide` (terminal): read-only diagnostics across config, MCP servers, skills, commands, hooks, and plugins.
-2. **Six troubleshooting skills** — teach an agent how to locate and fix each surface.
+2. **Seven troubleshooting skills** — teach an agent how to locate and fix each surface, plus a venv guide.
 
 ## Install the plugin
 
@@ -79,6 +79,7 @@ Each installed skill is also available as a slash command (e.g. `/hermes-configu
 | `diagnosing-commands` | Missing or overridden slash commands — skills-as-commands, bundles, plugin commands, per-platform permissions |
 | `diagnosing-hooks` | Hooks that don't fire — the four hook systems, shell-hook consent, `hermes hooks doctor` |
 | `diagnosing-plugins` | Plugins that don't load — the `plugins.enabled` gate, capability consent, discovery locations |
+| `venv-guide` | The dual-venv layout — how `.venv/` and `venv/` coexist, detection, canonical resolution order, cross-platform best practices |
 
 ## Design principle
 
