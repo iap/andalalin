@@ -56,8 +56,6 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 - **Don't confuse Hermes with Claude Code or ZCode**. Hermes has no standalone command files (commands come from built-ins, skills-as-slash, bundles, and plugins). Hooks have four separate systems, not one. Plugins use `plugin.yaml` + `register(ctx)`, not `plugin.json`.
 - **Don't copy zcode-guide patterns blindly** — Hermes differs structurally (commands, hooks, and plugin format are all different).
 - **Don't guess hook event names**. The valid set lives in `hermes_cli/plugins.py:VALID_HOOKS` and grows across releases — verify against the installed source rather than a hardcoded count.
-- **Don't hardcode `venv/` paths**. The project uses `.venv` as the canonical venv name (uv's default); `venv` is a legacy fallback. Always use `project_venv_dir()` from `hermes_constants.py` to resolve the venv path — never write `PROJECT_ROOT / "venv"` or `PROJECT_ROOT / ".venv"` directly. Resolution order: (1) `sys.prefix` if inside project root, (2) `.venv` (canonical), (3) `venv` (legacy). Both can coexist; `.venv` wins.
-
 ### Testing and validation
 
 There is no unit-test suite yet; CI enforces a syntax check and a plugin self-check. Before declaring work complete:
