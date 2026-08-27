@@ -88,13 +88,13 @@ def venv_python_path(venv_path: Path) -> Path:
 
 def activate_venv_command(venv_path: Path) -> str:
     """Return the shell command to activate a venv (for scripts/docs)."""
-    import shlex
     if sys.platform == "win32":
-        # Quote the path to handle spaces and shell metacharacters safely on Windows too
+        # Windows: use double quotes for paths with spaces
         activate = venv_path / "Scripts" / "activate.bat"
-        return shlex.quote(str(activate))
+        return f'"{activate}"'
     else:
-        # Quote the path to handle spaces and shell metacharacters safely
+        # POSIX: use shlex.quote for shell-safe quoting
+        import shlex
         activate = venv_path / "bin" / "activate"
         return f"source {shlex.quote(str(activate))}"
 
