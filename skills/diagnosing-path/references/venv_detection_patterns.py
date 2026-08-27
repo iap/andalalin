@@ -89,9 +89,9 @@ def venv_python_path(venv_path: Path) -> Path:
 def activate_venv_command(venv_path: Path) -> str:
     """Return the shell command to activate a venv (for scripts/docs)."""
     if sys.platform == "win32":
-        # Windows: use double quotes for paths with spaces; use `call` so control returns to caller
+        # Windows: use double quotes for paths with spaces; double percent signs to prevent batch expansion
         activate = venv_path / "Scripts" / "activate.bat"
-        return f'call "{activate}"'
+        return f'call "{str(activate).replace("%", "%%")}"'
     else:
         # POSIX: use shlex.quote for shell-safe quoting
         import shlex
