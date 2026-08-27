@@ -18,8 +18,36 @@ Short-lived branches, prefixed by type. Branch → merge to `master` → delete;
 |---|---|
 | `fix/` | Defects (wrong behavior), e.g. `fix/mcp-key-constants` |
 | `feat/` | Enhancements and refactors, e.g. `feat/plugin-hardening` |
+| `docs/` | Documentation-only changes |
+| `style/` | Formatting, no behavior change |
+| `refactor/` | Same behavior, different structure |
+| `perf/` | Performance improvements |
+| `test/` | Tests |
+| `chore/` | CI, deps, build tooling |
 
-Add a new prefix only when you actually need it (`docs/`, `chore/`, …).
+Add a new prefix only when you actually need it.
+
+## Commit Messages
+
+Use Conventional Commits format: `type(scope): summary`
+
+| Type | Use for |
+|---|---|
+| `fix` | Defects |
+| `feat` | Enhancements |
+| `docs` | Documentation |
+| `style` | Formatting |
+| `refactor` | Same behavior, different structure |
+| `perf` | Performance |
+| `test` | Tests |
+| `chore` | CI, deps, build |
+
+Scope is the affected surface (`mcp`, `checks`, `config`, `skills`, `hooks`, `plugins`, `ci`, `deps`).
+
+Examples:
+- `fix(mcp): correct key constants for OAuth flow`
+- `docs(agents): add venv path convention rule`
+- `feat(guide): add diagnosing-path skill`
 
 ## Skill naming convention
 
@@ -40,6 +68,12 @@ Add a new prefix only when you actually need it (`docs/`, `chore/`, …).
 ## Content Guidelines
 
 - Every diagnosis must resolve to a concrete action: a `hermes <subcommand>` or a specific file + field edit, then `/reload-*` or restart.
+- Use GitHub alert callouts where they genuinely help readers:
+  - `> [!NOTE]` — context not to miss
+  - `> [!TIP]` — optional shortcut
+  - `> [!IMPORTANT]` — required for success
+  - `> [!WARNING]` — breakage or data loss risk
+  - `> [!CAUTION]` — irreversible action (e.g., deleting config, removing a plugin)
 - Hermes configuration is YAML (`config.yaml`), never JSON.
 - `$HERMES_HOME` is `~/.hermes` on POSIX, `%LOCALAPPDATA%\hermes` on native Windows. Teach `hermes config path` as ground truth.
 - When Hermes changes behavior, update the affected skill(s) and bump their `version`.
