@@ -31,6 +31,7 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 ### Authoring skills
 
 - Each skill lives in its own directory under `skills/<name>/SKILL.md`.
+- **Naming convention**: `diagnosing-<surface>` for diagnostic skills (e.g. `diagnosing-mcp`, `diagnosing-path`). The `hermes-` prefix is reserved for the configuration map skill. Keep names kebab-case, lowercase, ≤20 characters.
 - Frontmatter requires `name` (slug), `description` (keep it short), and `version` (semver).
 - Content must be **verified against the installed Hermes source** (the local checkout or install location) — specifically `website/docs/` for documentation and `hermes_cli/` / `agent/` / `hermes_constants.py` for source truth. Do not rely solely on web search; the installed copy is authoritative for the version in use.
 - Hermes configuration is **YAML** (`config.yaml`), not JSON. Never reference JSON config syntax.
@@ -50,14 +51,26 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 - Name the exact `hermes` command (e.g. `hermes config path`), not a generic description ("run the config command").
 - Tables for structured data (pitfall catalogs, system comparisons). Bullet lists for steps.
 - Keep each SKILL.md focused on one surface (MCP, skills, commands, hooks, plugins, or the config map).
+- Use GitHub alert callouts where they genuinely help:
+  > [!NOTE] — context not to miss
+  > [!TIP] — optional shortcut
+  > [!IMPORTANT] — required for success
+  > [!WARNING] — breakage/data loss risk
+  > [!CAUTION] — irreversible action
 
 ### Common pitfalls to avoid
 
-- **Don't confuse Hermes with Claude Code or ZCode**. Hermes has no standalone command files (commands come from built-ins, skills-as-slash, bundles, and plugins). Hooks have four separate systems, not one. Plugins use `plugin.yaml` + `register(ctx)`, not `plugin.json`.
-- **Don't copy zcode-guide patterns blindly** — Hermes differs structurally (commands, hooks, and plugin format are all different).
-- **Don't guess hook event names**. The valid set lives in `hermes_cli/plugins.py:VALID_HOOKS` and grows across releases — verify against the installed source rather than a hardcoded count.
-- **Don't hardcode `venv/` paths**. The project uses `.venv` as the canonical venv name (uv's default); `venv` is a legacy fallback. Always use `project_venv_dir()` from `hermes_constants.py` to resolve the venv path — never write `PROJECT_ROOT / "venv"` or `PROJECT_ROOT / ".venv"` directly. Resolution order: (1) `sys.prefix` if inside project root, (2) `.venv` (canonical), (3) `venv` (legacy). Both can coexist; `.venv` wins.
+> [!WARNING]
+> **Don't confuse Hermes with Claude Code or ZCode**. Hermes has no standalone command files (commands come from built-ins, skills-as-slash, bundles, and plugins). Hooks have four separate systems, not one. Plugins use `plugin.yaml` + `register(ctx)`, not `plugin.json`.
 
+> [!WARNING]
+> **Don't copy zcode-guide patterns blindly** — Hermes differs structurally (commands, hooks, and plugin format are all different).
+
+> [!IMPORTANT]
+> **Don't guess hook event names**. The valid set lives in `hermes_cli/plugins.py:VALID_HOOKS` and grows across releases — verify against the installed source rather than a hardcoded count.
+
+> [!NOTE]
+> **Don't hardcode `venv/` paths**. The project uses `.venv` as the canonical venv name (uv's default); `venv` is a legacy fallback. Both can coexist — `.venv` wins. See the `diagnosing-path` skill for detection patterns, canonical resolution order, and cross-platform best practices.
 ### Testing and validation
 
 There is no unit-test suite yet; CI enforces a syntax check and a plugin self-check. Before declaring work complete:
@@ -70,4 +83,10 @@ There is no unit-test suite yet; CI enforces a syntax check and a plugin self-ch
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution workflow, branch naming, commit message format, and content guidelines.
+
+### Branch and commit quick reference
+
+- Branch: `type/description` (e.g. `fix/mcp-key-constants`, `docs/agents-venv-rule`)
+- Commit: `type(scope): summary` (e.g. `fix(mcp): correct OAuth key constants`)
+- Types: `fix`, `feat`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`

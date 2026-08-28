@@ -5,7 +5,7 @@
 Hermes usage and self-diagnosis guide for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It ships two things:
 
 1. **A plugin** — `/hermes-doctor` (in-session) and `hermes guide` (terminal): read-only diagnostics across config, MCP servers, skills, commands, hooks, and plugins.
-2. **Six troubleshooting skills** — teach an agent how to locate and fix each surface.
+2. **Seven troubleshooting skills** — teach an agent how to locate and fix each surface, plus a venv guide.
 
 ## Install the plugin
 
@@ -61,11 +61,11 @@ hermes skills tap add iap/hermes-guide
 hermes skills install iap/hermes-guide/skills/hermes-configuration-guide
 ```
 
-The other five skills use the same `iap/hermes-guide/skills/<name>` form:
-`diagnosing-mcp`, `diagnosing-skills`, `diagnosing-commands`, `diagnosing-hooks`, `diagnosing-plugins`.
+The other six skills use the same `iap/hermes-guide/skills/<name>` form:
+`diagnosing-mcp`, `diagnosing-skills`, `diagnosing-commands`, `diagnosing-hooks`, `diagnosing-plugins`, `diagnosing-path`.
 
-> **Note:** the identifier must include the `skills/` prefix (it is the repo-relative
-> path to the skill's `SKILL.md`). The shorter `iap/hermes-guide/<name>` form does not resolve.
+> [!NOTE]
+> The identifier must include the `skills/` prefix (it is the repo-relative path to the skill's `SKILL.md`). The shorter `iap/hermes-guide/<name>` form does not resolve.
 
 Each installed skill is also available as a slash command (e.g. `/hermes-configuration-guide`).
 
@@ -79,6 +79,7 @@ Each installed skill is also available as a slash command (e.g. `/hermes-configu
 | `diagnosing-commands` | Missing or overridden slash commands — skills-as-commands, bundles, plugin commands, per-platform permissions |
 | `diagnosing-hooks` | Hooks that don't fire — the four hook systems, shell-hook consent, `hermes hooks doctor` |
 | `diagnosing-plugins` | Plugins that don't load — the `plugins.enabled` gate, capability consent, discovery locations |
+| `diagnosing-path` | Path issues — the dual-venv layout (.venv/venv), detection, canonical resolution order, cross-platform best practices |
 
 ## Design principle
 
