@@ -86,10 +86,19 @@ def venv_python_path(venv_path: Path) -> Path:
     return bin_dir / exe
 
 
-def activate_venv_command(venv_path: Path) -> str:
-    """Return the shell command to activate a venv (for scripts/docs)."""
-    if sys.platform == "win32":
-        # Windows: use double quotes for paths with spaces; double percent signs to prevent batch expansion
+def activate_venv_command(venv_path: Path, shell: str = "cmd") -> str:
+    """Return the shell command to activate a venv (for scripts/docs).
+    
+    Args:
+        venv_path: Path to the virtual environment
+        shell: "cmd" for Command Prompt, "powershell" for PowerShell, "posix" for bash/zsh
+    """
+    if shell == "powershell":
+        # PowerShell: use & operator and Source command
+        activate = venv_path / "Scripts" / "Activate.ps1"
+        return f'& "{str(activate).replace("%", "%%")}"'
+    elif shell == "win" or sys.platform == "win32":
+        # cmd: use double quotes for paths with spaces; escape percent signs; use `call` to return to caller
         activate = venv_path / "Scripts" / "activate.bat"
         return f'call "{str(activate).replace("%", "%%")}"'
     else:
