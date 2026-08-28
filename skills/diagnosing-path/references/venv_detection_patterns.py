@@ -94,9 +94,10 @@ def activate_venv_command(venv_path: Path, shell: str = "cmd") -> str:
         shell: "cmd" for Command Prompt, "powershell" for PowerShell, "posix" for bash/zsh
     """
     if shell == "powershell":
-        # PowerShell: use & operator and Source command
+        # PowerShell: use & operator; double quotes handle spaces and special chars
+        # No percent escaping needed — CMD's %% is not valid PowerShell syntax
         activate = venv_path / "Scripts" / "Activate.ps1"
-        return f'& "{str(activate).replace("%", "%%")}"'
+        return f'& "{activate}"'
     elif shell == "win" or sys.platform == "win32":
         # cmd: use double quotes for paths with spaces; escape percent signs; use `call` to return to caller
         activate = venv_path / "Scripts" / "activate.bat"
