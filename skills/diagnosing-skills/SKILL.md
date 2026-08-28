@@ -1,11 +1,11 @@
 ---
 name: diagnosing-skills
 description: Diagnose Hermes skills that are not discovered, not loading, shadowed, hidden by platform or toolset conditions, or stuck as user-modified after edits.
-version: 1.0.0
+version: 1.0.1
 metadata:
   hermes:
     tags: [hermes, skills, troubleshooting]
-    category: guide
+    related_skills: [hermes-configuration-guide]
 ---
 
 # Diagnosing Skill Configuration

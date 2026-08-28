@@ -1,11 +1,11 @@
 ---
 name: diagnosing-path
 description: "Diagnose Hermes Agent path issues — the dual-venv layout (.venv/venv), how to detect which venv is active, the canonical resolution order, and best practices for code, scripts, and documentation that reference paths."
-version: 1.0.0
+version: 1.0.1
 metadata:
   hermes:
     tags: [hermes, path, venv, python, troubleshooting, guide]
-    category: guide
+    related_skills: [hermes-configuration-guide, diagnosing-cli-tui]
 ---
 
 # Hermes Agent Path Diagnostics
@@ -25,7 +25,7 @@ Both can coexist. When they do, `.venv` wins (it's newer, managed by uv, and Pyt
 
 **Why this happened:** Older installs and some documentation used `python -m venv venv`. When uv became the default package manager, `uv venv` created `.venv`. Migration scripts didn't remove the old `venv/`, so both persist.
 
-**Current state upstream:** 15+ code sites in `hermes_cli/` hardcode `PROJECT_ROOT / "venv"`. There is no single `project_venv_dir()` resolver in `hermes_constants.py` (only `venv_bin_dir(venv_dir)` which requires you to already know the path). This is a known gap.
+**Current state upstream:** 11 code sites in `hermes_cli/` (14 across the repo) hardcode `PROJECT_ROOT / "venv"`. There is no single `project_venv_dir()` resolver in `hermes_constants.py` (only `venv_bin_dir(venv_dir)` which requires you to already know the path). This is a known gap.
 
 ## Detection — Is a venv active?
 
