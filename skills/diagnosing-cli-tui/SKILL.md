@@ -1,7 +1,7 @@
 ---
 name: diagnosing-cli-tui
 description: "Diagnose and fix Hermes Agent CLI/TUI issues on native Windows (PowerShell/conhost, Git Bash backend): rendering artifacts, themes/skins, busy indicators, mouse modes, encoding, and launch/resume."
-version: 1.0.3
+version: 1.0.4
 metadata:
   hermes:
     tags: [hermes, tui, cli, windows, themes, troubleshooting, diagnosing]
@@ -14,7 +14,10 @@ Playbook for running and fixing the Hermes Agent CLI/TUI on this machine.
 Use when the TUI misrenders, truncates, shows unreadable indicators, fails
 to launch, or when asked how to theme/skin Hermes on Windows.
 
-## 0. Environment baseline (this machine, verified 2026-08-24)
+## 0. Environment baseline (origin machine: one Windows box, verified 2026-08-24)
+
+> [!CAUTION]
+> This baseline records **one specific Windows machine** — the box this skill was written on. It is **not** a description of your machine. Before applying anything below, confirm the local environment with `hermes config path`, `hermes --version`, and `hermes doctor`; paths, `HERMES_HOME`, shell, and OS differ per machine (on macOS/Linux the home is `~/.hermes`, not `%LOCALAPPDATA%\hermes`).
 
 - Hermes Agent v0.20.4, git install: `%LOCALAPPDATA%\hermes\hermes-agent` (venv inside)
 - `HERMES_HOME = %LOCALAPPDATA%\hermes` (native Windows; `~/.hermes` is NOT the active home)
@@ -33,7 +36,7 @@ hermes --tui -c     # resume latest TUI session (or HERMES_TUI_RESUME=1 / displa
 hermes --cli        # force classic REPL for one invocation
 ```
 
-Applied on this machine (config.yaml, backup: `config.yaml.bak-20260824-0457`):
+Applied on the origin machine (config.yaml, backup: `config.yaml.bak-20260824-0457`):
 
 ```yaml
 display:
@@ -102,7 +105,7 @@ User env vars: `EDITOR=code --wait`, `HERMES_TUI_THEME=dark`.
 ```powershell
 hermes --version; hermes doctor      # Node >= 20, bash, deps
 hermes config get display            # confirm keys above
-hermes skills list                   # this skill should appear (local, enabled)
+hermes skills list                   # this skill should appear (hub or local, enabled)
 # in TUI: /indicator ascii; /skin slate; /mouse wheel; /usage; /exit
 ```
 

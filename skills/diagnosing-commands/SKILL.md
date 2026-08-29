@@ -1,7 +1,7 @@
 ---
 name: diagnosing-commands
 description: Diagnose missing or overridden Hermes slash commands — skills as commands, skill bundles, plugin-registered commands, and per-platform admin/user permissions.
-version: 1.0.1
+version: 1.0.2
 metadata:
   hermes:
     tags: [hermes, commands, troubleshooting]
@@ -29,7 +29,7 @@ Multiple leading `/skill` tokens stack (up to 5) in one message; parsing stops a
 2. **Command name differs from the folder name** — the slash command uses the frontmatter `name`. → Reference the frontmatter name or rename it.
 3. **`/name` loads the wrong thing** — a bundle with the same slug shadows the skill (intentional), or a local skill shadows an external one. → `hermes bundles list`; rename one of them.
 4. **A plugin's command is missing** — the plugin is installed but not in `plugins.enabled`. → `hermes plugins enable <name>`; restart. Follow **`diagnosing-plugins`**.
-5. **Command works in the CLI but not on Telegram/Discord/Slack** — messaging platforms have an admin/user split: regular users only get commands listed in that platform's `user_allowed_commands` (plus `/help`, `/whoami`); if `allow_admin_from` is unset the platform is unrestricted. → Set both in the platform's `extra:` block in `~/.hermes/config.yaml`, restart the gateway.
+5. **Command works in the CLI but not on Telegram/Discord/Slack** — each messaging platform can gate slash commands by role, **scoped separately for DMs and groups**: when `allow_admin_from` (or `group_allow_admin_from`) lists user IDs, admins get every command and non-admins get only `user_allowed_commands` (plus `/help`, `/whoami`); if **no** admin list is set for a scope, gating is **off** for that scope and every allowed user can run everything. → Set the keys in the platform's `extra:` block in `~/.hermes/config.yaml`, restart the gateway.
 6. **Command exists but arguments vanish** — stacking parsing consumed what looked like a flag, or the command takes no args (e.g. `/plan` treats trailing text as its request). → Check the command's entry in `/help`; avoid leading `/` in arguments you want passed through.
 7. **Aliases behave oddly** — many commands have aliases (`/reset`→`/new`, `/ctx`→`/context`); both dispatch identically. → Not a bug; check the canonical name in the reference.
 
