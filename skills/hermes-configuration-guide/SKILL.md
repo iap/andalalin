@@ -1,7 +1,7 @@
 ---
 name: hermes-configuration-guide
 description: Map of Hermes Agent configuration — where MCP servers, skills, commands, hooks, and plugins live, and which diagnostic skill to load when something does not work.
-version: 1.0.2
+version: 1.0.3
 metadata:
   hermes:
     tags: [hermes, configuration, troubleshooting]
@@ -50,6 +50,6 @@ Never guess where Hermes reads its files. The home directory differs by platform
 - A hook not firing, blocked consent, or behaving unexpectedly → **`diagnosing-hooks`**
 - A plugin not loading, not enabled, or missing capabilities → **`diagnosing-plugins`**
 - Script/path/venv problems (wrong interpreter, `venv/bin/python` missing, the dual `.venv`/`venv` layout) → **`diagnosing-path`**
-- Terminal/TUI issues (misrendering, themes, indicators, launch failures) → **`diagnosing-cli-tui`**
+- Terminal/TUI issues on **native Windows** (misrendering, themes, indicators, launch failures) → **`diagnosing-cli-tui`**; on POSIX/WSL there is no dedicated skill yet — start with `hermes doctor` and the `display:` block of `config.yaml`
 
 Every diagnosis should end in a concrete action: a `hermes <subcommand>` command or a specific file + field edit, then a restart or `/reload-*` to apply.

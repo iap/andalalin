@@ -1,7 +1,7 @@
 ---
 name: diagnosing-cli-tui
 description: "Diagnose and fix Hermes Agent CLI/TUI issues on native Windows (PowerShell/conhost, Git Bash backend): rendering artifacts, themes/skins, busy indicators, mouse modes, encoding, and launch/resume."
-version: 1.0.4
+version: 1.0.5
 metadata:
   hermes:
     tags: [hermes, tui, cli, windows, themes, troubleshooting, diagnosing]
@@ -17,7 +17,7 @@ to launch, or when asked how to theme/skin Hermes on Windows.
 ## 0. Environment baseline (origin machine: one Windows box, verified 2026-08-24)
 
 > [!CAUTION]
-> This baseline records **one specific Windows machine** — the box this skill was written on. It is **not** a description of your machine. Before applying anything below, confirm the local environment with `hermes config path`, `hermes --version`, and `hermes doctor`; paths, `HERMES_HOME`, shell, and OS differ per machine (on macOS/Linux the home is `~/.hermes`, not `%LOCALAPPDATA%\hermes`).
+> This baseline records **one specific Windows machine** — the box this skill was written on. It is **not** a description of your machine. Before applying anything below, confirm the local environment with `hermes config path`, `hermes --version`, and `hermes doctor`; paths, `HERMES_HOME`, shell, and OS differ per machine (on macOS/Linux the **default** home is `~/.hermes` — overridable via `HERMES_HOME` or a named profile; `hermes config path` always prints the active one).
 
 - Hermes Agent v0.20.4, git install: `%LOCALAPPDATA%\hermes\hermes-agent` (venv inside)
 - `HERMES_HOME = %LOCALAPPDATA%\hermes` (native Windows; `~/.hermes` is NOT the active home)
