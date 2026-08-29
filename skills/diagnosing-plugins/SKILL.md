@@ -1,7 +1,7 @@
 ---
 name: diagnosing-plugins
 description: Diagnose Hermes plugins that do not load or run — the plugins.enabled opt-in gate, capability consent, discovery locations, and provider sub-categories.
-version: 1.0.1
+version: 1.0.2
 metadata:
   hermes:
     tags: [hermes, plugins, troubleshooting]
@@ -22,7 +22,7 @@ A Hermes plugin is a **Python package**: a directory with a `plugin.yaml` manife
 | pip | `hermes_agent.plugins` entry points | `plugins.enabled` |
 | Nix | `services.hermes-agent.extraPlugins` | Nix config |
 
-`hermes plugins install owner/repo [--ref <40-char SHA>] [--enable|--no-enable]` installs from Git (pinned commits only); `hermes plugins update` refuses to move a pinned plugin. Sub-category directories have their **own loaders and selection keys** — they do not obey `plugins.enabled`: `platforms/<name>/` (channels, gated per-platform in config), `memory/<name>/` (one active, `memory.provider`), `context_engine/<name>/` (`context.engine`), `model-providers/<name>/` (picked via `--provider`/config), `image_gen/<name>/` (`image_gen.provider`).
+`hermes plugins install owner/repo [--ref <40-char SHA>] [--enable|--no-enable]` installs from Git (pinned commits only); `hermes plugins update` refuses to move a pinned plugin. Sub-category directories have their **own loaders and selection keys** — they do not obey `plugins.enabled`: `platforms/<name>/` (messaging channels, gated per messaging platform in config), `memory/<name>/` (one active, `memory.provider`), `context_engine/<name>/` (`context.engine`), `model-providers/<name>/` (picked via `--provider`/config), `image_gen/<name>/` (`image_gen.provider`).
 
 ## 2. The enable gate and capabilities
 

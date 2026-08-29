@@ -1,7 +1,7 @@
 ---
 name: diagnosing-mcp
 description: Diagnose Hermes MCP servers that will not connect, expose no tools, fail OAuth, or ignore config — with the exact config.yaml fields and hermes mcp commands to fix each.
-version: 1.0.1
+version: 1.0.2
 metadata:
   hermes:
     tags: [hermes, mcp, troubleshooting]
@@ -38,7 +38,7 @@ Per-server tool filtering: `tools.include` (whitelist) / `tools.exclude` (blackl
 
 ## 3. Pitfalls (symptom → cause → fix)
 
-1. **Server not listed at all** — YAML syntax error in `config.yaml` drops servers (or the whole file), or `enabled: false` skips the server entirely. → Validate YAML; set `enabled: true` or remove the field.
+1. **Server not listed at all** — YAML syntax error in `config.yaml` drops servers (or the whole file), `enabled: false` skips the server entirely, or the entry was **simply never added**. → Validate YAML; check the entry exists under `mcp_servers:`; set `enabled: true` or remove the field.
 2. **`command not found` / spawn ENOENT** — `command` is not on PATH. On Windows point at the `.cmd`/`.exe` or use an absolute path; verify with `node --version` / `npx --version` in the same shell Hermes uses.
 3. **Tools missing** — a `tools.include`/`exclude` filter removed them (include wins), or the server session lacks the capability (resource/prompt wrappers only register when the server supports them), or the server failed to connect so nothing registered. → Run `hermes mcp configure <name>`; check status in `hermes mcp`.
 4. **OAuth never completes** — (a) config edited inside a running session: the 30s auto-reload kills the browser flow → run `hermes mcp login <name>` from a fresh terminal; (b) headless/remote host → use paste-back of the redirect URL, SSH port-forward, or `oauth.redirect_uri`; (c) WAF 403s loopback redirects → set `oauth.redirect_host: localhost`.
