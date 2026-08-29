@@ -14,7 +14,7 @@
 | Repo | origin `iap/hermes-agent` (fork), upstream `NousResearch/hermes-agent`, HEAD `13ce0c5c67` | `git remote -v`, `git log` |
 | TUI frontend | `hermes-tui` — React 19 + custom Ink fork (`@hermes/ink`), esbuild bundle, `ui-tui/dist/entry.js`; launched as a Node subprocess from the Python CLI | `ui-tui/package.json`, TUI docs |
 | TUI gateway | Python `tui_gateway/`; in-process gateway; optionally `HERMES_TUI_GATEWAY_URL` for the web dashboard's embedded chat | TUI docs |
-| Shell | Windows PowerShell **5.1.19041.7663**, Windows 10 22H2 (build 19045), classic console host (conhost) window | screenshot title bar, `$PSVersionTable` |
+| Shell | Windows PowerShell **5.1** (full version 19041.7663), Windows 10 22H2 (build 19045), classic conhost console window | screenshot title bar, `$PSVersionTable` |
 | bash backend | PortableGit (MinGit, msys2-based) at `%LOCALAPPDATA%\hermes\git`, resolved via `HERMES_GIT_BASH_PATH`; fallback chain documented | Windows-native guide |
 | Model in screenshot | `stealth/ox-alpha` via Nous inference API (1M context) — matches `config.yaml` `model.default` | config + screenshot rows |
 | Config overrides | `display`: only `compact/personality/resume_display` set — skin, interface, indicator, mouse tracking all **defaults** | `%LOCALAPPDATA%\hermes\config.yaml` |
