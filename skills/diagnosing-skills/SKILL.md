@@ -1,7 +1,7 @@
 ---
 name: diagnosing-skills
 description: Diagnose Hermes skills that are not discovered, not loading, shadowed, hidden by platform or toolset conditions, or stuck as user-modified after edits.
-version: 1.0.2
+version: 1.0.3
 metadata:
   hermes:
     tags: [hermes, skills, troubleshooting]
@@ -41,6 +41,7 @@ Goal: reduce any skill problem to one concrete fix. Distinguish **discovered** (
 8. **Hub skill drifted from upstream** — upstream changed after install. → `hermes skills check` then `hermes skills update [name]`.
 9. **New bundled skills never appear** — profile has a `.no-bundled-skills` marker. → `hermes skills opt-in --sync`.
 10. **Plugin skill gone** — the providing plugin was disabled. → `hermes plugins enable <name>`.
+11. **`hermes-agent` cannot be disabled** — it is in `ESSENTIAL_SKILLS` (`agent/skill_utils.py`): disable requests for it are ignored everywhere the disabled list is consulted, by design (it is the agent's operating manual and the system prompt points at it unconditionally). → Not a bug.
 
 ## 5. Localization workflow
 

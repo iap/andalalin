@@ -1,7 +1,7 @@
 ---
 name: diagnosing-hooks
 description: Diagnose Hermes hooks that do not fire — gateway HOOK.yaml hooks, plugin hooks, shell hooks stuck on consent, and outbound webhooks — using hermes hooks doctor.
-version: 1.0.2
+version: 1.0.3
 metadata:
   hermes:
     tags: [hermes, hooks, troubleshooting]
@@ -34,6 +34,20 @@ hooks:
 
 Protocol: JSON payload on stdin, optional JSON response on stdout. Exit code **2** blocks the tool call (Claude-Code compatible). Block shapes: `{"decision": "block", "reason": ...}` or `{"action": "block", "message": ...}`; context injection: `{"context": "..."}` for `pre_llm_call`.
 
+### Plugin-hook callback timeouts (how they fail)
+
+Python plugin callbacks (`ctx.register_hook(cb)`) get a default **30s** wall-clock timeout
+(`plugins.hook_callback_timeout` overrides it; hard cap 600s). How a timeout resolves depends
+on the hook class:
+
+| Hook class | On timeout |
+|---|---|
+| Policy hooks — `pre_tool_call` | **fail closed**: the tool is blocked (`pre_tool_call plugin callback timed out or is still running`) |
+| Bounded hooks | **fail open**: the callback is abandoned, the agent continues |
+| Low-frequency lifecycle hooks | intentionally unbounded |
+
+After a timeout the same callback is suppressed for 60s, so a hung plugin cannot re-fire immediately.
+
 **Consent gate**: each unique `(event, command)` pair prompts once, then persists to `$HERMES_HOME/shell-hooks-allowlist.json`. On non-TTY runs (gateway, cron, CI) an unapproved hook **silently stays unregistered** — bypass with `--accept-hooks`, `HERMES_ACCEPT_HOOKS=1`, or `hooks_auto_accept: true`, or hand-edit the allowlist (`approvals` array with exact `event` + `command` strings — a sha256-keyed object is the wrong format).
 
 ## 2. How to inspect
@@ -48,7 +62,7 @@ Protocol: JSON payload on stdin, optional JSON response on stdout. Exit code **2
 
 1. **Hook never fires** — (a) gateway hook used in a CLI session (gateway-only); (b) shell hook not on the consent allowlist after a non-TTY start; (c) event name typo (config parse prints "Did you mean X?" and skips); (d) plugin providing it is disabled. → Match system to surface; `hermes hooks doctor`; `hermes plugins list`.
 2. **Hook ran once, then edits do nothing** — consent keys on the exact command string; script edits are silently trusted, but if you changed the command in config it's a **new** pair needing fresh consent. → `hermes hooks list`; re-approve.
-3. **Block not blocking** — exit code 2 or block JSON only works on `pre_tool_call`; a plugin-registered `pre_tool_call` may have blocked first (plugins register before shell hooks; first valid block wins); `fail_closed` on other events is ignored with a warning. → Scope the hook correctly.
+3. **Block not blocking** — exit code 2 or block JSON only works on `pre_tool_call`; a plugin-registered `pre_tool_call` may have blocked first (plugins register before shell hooks; first valid block wins); `fail_closed` on other events is ignored with a warning; a *timed-out* plugin `pre_tool_call` callback also blocks (policy hooks fail closed on timeout). → Scope the hook correctly.
 4. **Hook times out** — timeouts over 300s are clamped; a slow script needs to be async. → Lower the work or raise `timeout` within the cap.
 5. **Stdout produces nothing / agent warns about bad JSON** — print responses as single-line JSON (`printf '{"context": ...}'`); stack traces on stdout are unparseable. With `fail_closed: true` on `pre_tool_call`, non-JSON stdout **blocks** the call — intended.
 6. **Outbound webhook not delivering** — endpoints are fire-and-forget with one retry on 5xx/connection errors, no redirects followed, bounded queue. → Check `hermes hooks list` (is it listed/signed?), receiver logs; use `secret_env` + verify `X-Hermes-Signature-256` (HMAC-SHA256) on the receiver.
