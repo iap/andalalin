@@ -1,7 +1,7 @@
 ---
 name: diagnosing-skills
 description: Diagnose Hermes skills that are not discovered, not loading, shadowed, hidden by platform or toolset conditions, or stuck as user-modified after edits.
-version: 1.0.1
+version: 1.0.2
 metadata:
   hermes:
     tags: [hermes, skills, troubleshooting]
@@ -21,7 +21,7 @@ Goal: reduce any skill problem to one concrete fix. Distinguish **discovered** (
 
 ## 2. SKILL.md format
 
-`---` frontmatter requires `name` and `description` (house style: ≤60-char description, front-load trigger wording — the index shows name + description and that is what the model matches on). Optional: `version`, `platforms: [macos, linux, windows]`, `required_environment_variables`, and `metadata.hermes` — `tags`, `category`, and conditional activation `fallback_for_toolsets` / `requires_toolsets` / `fallback_for_tools` / `requires_tools`, plus `config` declarations (stored under `skills.config`, surfaced via `hermes config migrate`).
+`---` frontmatter requires `name` and `description` (house style: front-load the trigger wording — the index shows name + description and that is what the model matches on; keep the first ~60 characters to the point, and it is fine for the full description to run longer — verify triggering with a one-shot `hermes -z` ask if unsure). Optional: `version`, `platforms: [macos, linux, windows]`, `required_environment_variables`, and `metadata.hermes` — `tags`, `category`, and conditional activation `fallback_for_toolsets` / `requires_toolsets` / `fallback_for_tools` / `requires_tools`, plus `config` declarations (stored under `skills.config`, surfaced via `hermes config migrate`).
 
 ## 3. How to inspect
 

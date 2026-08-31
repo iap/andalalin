@@ -1,7 +1,7 @@
 ---
 name: diagnosing-cli-tui
 description: "Diagnose and fix Hermes Agent CLI/TUI issues on native Windows (PowerShell/conhost, Git Bash backend): rendering artifacts, themes/skins, busy indicators, mouse modes, encoding, and launch/resume."
-version: 1.0.5
+version: 1.0.6
 metadata:
   hermes:
     tags: [hermes, tui, cli, windows, themes, troubleshooting, diagnosing]
@@ -34,6 +34,10 @@ hermes              # classic CLI by default; launches TUI when display.interfac
 hermes --tui        # force TUI
 hermes --tui -c     # resume latest TUI session (or HERMES_TUI_RESUME=1 / display.tui_auto_resume_recent: true)
 hermes --cli        # force classic REPL for one invocation
+hermes -z "prompt"  # one-shot (--oneshot): run a single prompt with tools, print the answer, exit.
+                    #   Non-interactive — ideal for scripts, cron, and CI smoke-tests (e.g. verifying a
+                    #   skill is discoverable AND followed: hermes -z "Use the diagnosing-path skill: which
+                    #   interpreter should a script in the checkout use?"). Exits non-zero on failure.
 ```
 
 Applied on the origin machine (config.yaml, backup: `config.yaml.bak-20260824-0457`):

@@ -74,6 +74,13 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 ### Testing and validation
 
 There is no unit-test suite yet; CI enforces a syntax check and a plugin self-check. Before declaring work complete:
+
+Beyond the CI gates, smoke-test the *model-facing* behavior with a one-shot run — this verifies discovery AND that the skill's instructions are actually followed:
+
+```bash
+hermes -z "Use the diagnosing-path skill: which interpreter should a script in the Hermes checkout use?"
+```
+
 1. Run `python -m py_compile __init__.py checks.py constants.py`.
 2. Run `hermes plugins doctor . --ci` from the repo root.
 3. Read each changed SKILL.md back and confirm YAML frontmatter parses cleanly (three dashes, valid keys, no tab indentation in YAML).
