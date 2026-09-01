@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Hermes Agent (core) bug or feature
+    url: https://github.com/NousResearch/hermes-agent/issues
+    about: Bugs in Hermes itself belong upstream. This repo only documents and diagnoses Hermes.
+  - name: Security-scanner false positives (Hermes core)
+    url: https://github.com/NousResearch/hermes-agent/issues/92021
+    about: Canonical upstream issue for skills/plugins scanner false positives.

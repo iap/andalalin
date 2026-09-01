@@ -1,0 +1,23 @@
+name: "Bug report"
+description: Something in the plugin, checks, or docs is wrong or broken.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Expected vs actual.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Hermes version / commit
+      placeholder: "v0.20.4 (13ce0c5)"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Command output or logs (redact tokens).
