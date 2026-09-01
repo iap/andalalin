@@ -1,0 +1,18 @@
+skills:
+  - changed-files:
+      - any-glob-to-any-file: "skills/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**"
+
+drift:
+  - changed-files:
+      - any-glob-to-any-file: ".github/upstream-drift.baseline"
+
+tooling:
+  - changed-files:
+      - any-glob-to-any-file: "tools/**"
+
+documentation:
+  - any: ["*.md", "AGENTS.md", "CONTRIBUTING.md", "README.md", "SECURITY.md"]

@@ -176,7 +176,10 @@ def main() -> int:
         return 0
 
     subprocess.run(
-        ["gh", "issue", "create", "--repo", repo, "--title", ISSUE_TITLE, "--body", body],
+        [
+            "gh", "issue", "create", "--repo", repo, "--title", ISSUE_TITLE,
+            "--body", body, "--label", "drift,maintenance",
+        ],
         check=True,
     )
     print("Opened drift issue.")

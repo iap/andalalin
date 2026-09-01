@@ -1,0 +1,39 @@
+name: "Skill drift (fact no longer matches Hermes)"
+description: A claim in a skill or in checks.py/constants.py no longer matches the installed or upstream Hermes source.
+labels: ["drift", "skills"]
+body:
+  - type: dropdown
+    id: skill
+    attributes:
+      label: Which skill or fact file
+      options:
+        - diagnosing-mcp
+        - diagnosing-skills
+        - diagnosing-commands
+        - diagnosing-hooks
+        - diagnosing-plugins
+        - diagnosing-path
+        - diagnosing-cli-tui
+        - hermes-configuration-guide
+        - checks.py / constants.py
+    validations:
+      required: true
+  - type: input
+    id: hermes_version
+    attributes:
+      label: Hermes version / commit
+      description: "`hermes --version`, or the git SHA you verified against"
+      placeholder: "v0.20.4 (13ce0c5)"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence from source
+      description: The upstream/installed source lines that contradict the guide (file + line numbers).
+    validations:
+      required: true
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested correction
