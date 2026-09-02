@@ -91,9 +91,3 @@ hermes -z "Use the diagnosing-path skill: which interpreter should a script in t
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution workflow, branch naming, commit message format, and content guidelines.
-
-### Branch and commit quick reference
-
-- Branch: `type/description` (e.g. `fix/mcp-key-constants`, `docs/agents-venv-rule`)
-- Commit: `type(scope): summary` (e.g. `fix(mcp): correct OAuth key constants`)
-- Types: `fix`, `feat`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
