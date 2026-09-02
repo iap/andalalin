@@ -11,6 +11,8 @@ Opt-in `proactive: true` runs drift checks on session start/end and logs
 findings (observer-only; nothing is injected or modified).
 """
 
+__version__ = "0.2.1"
+
 import logging
 import sys
 
