@@ -1,7 +1,7 @@
 ---
 name: diagnosing-auth
-description: "Diagnose Hermes hub-install auth failures — a dead or shadowing GITHUB_TOKEN in the profile .env, the gh-cli fallback, 401-vs-anonymous probes, and GitHub rate-limit verdicts."
-version: 1.0.1
+description: "Diagnose hub-install failures where installs say 'Could not fetch from any source' on public repos with gh logged in — a dead or shadowing GITHUB_TOKEN in the profile .env, the gh-cli fallback, 401-vs-anonymous probes, and rate-limit verdicts."
+version: 1.0.2
 metadata:
   hermes:
     tags: [hermes, auth, github, token, rate-limit, troubleshooting, diagnosing]
