@@ -1,7 +1,7 @@
 ---
 name: diagnosing-auth
 description: "Diagnose Hermes hub-install auth failures — a dead or shadowing GITHUB_TOKEN in the profile .env, the gh-cli fallback, 401-vs-anonymous probes, and GitHub rate-limit verdicts."
-version: 1.0.0
+version: 1.0.1
 metadata:
   hermes:
     tags: [hermes, auth, github, token, rate-limit, troubleshooting, diagnosing]
@@ -37,6 +37,7 @@ The load-bearing fact: **a stale token at priority 1 shadows everything below it
   ```
 
 - **Is the env token itself alive?** `GET https://api.github.com/rate_limit` with `Authorization: Bearer <token>` — print only the status code, never the token. **401 = dead** (remove or refresh it); **200 = alive**; compare against the same request without the header (public repos answer 200 anonymous).
+- **Alive is not authorized.** A `200` from `/rate_limit` proves the token is valid, **not** that it can see the repo being installed — fine-grained PATs scoped to other repos answer `404` on that repository's endpoint. Probe the repo itself (`GET /repos/<owner>/<repo>`) with the same header: `404` on a live token means no access for that token (scope or wrong identifier), not a dead token.
 - `gh auth status` — account, scopes, and whether the gh token is still valid.
 - Scan the profile `.env` for *active* (uncommented) `GITHUB_TOKEN` / `GH_TOKEN` lines — a commented line is inert, an active one wins priority 1.
 
