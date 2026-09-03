@@ -1,5 +1,8 @@
 """hermes-guide plugin — executable, read-only Hermes configuration diagnostics.
 
+Complements Hermes's built-in diagnostics (hermes doctor / hermes verify) —
+it covers what they don't; it does not replace them.
+
 Exposes:
   - `/hermes-doctor`  slash command  (CLI + gateway sessions)
   - `hermes guide <scope>`  CLI subcommand  (terminal; exit 1 on broken or unknown)

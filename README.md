@@ -2,7 +2,7 @@
 
 > **Package / slug:** `hermes-guide`
 
-Hermes usage and self-diagnosis guide for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It ships two things:
+Hermes usage and self-diagnosis guide for [Hermes Agent](https://github.com/NousResearch/hermes-agent). **It complements — not replaces — Hermes's built-in diagnostics** (`hermes doctor`, `hermes verify`, and the platform helpers): it is an extra layer covering what they don't. It ships two things:
 
 1. **A plugin** — `/hermes-doctor` (in-session) and `hermes guide` (terminal): read-only diagnostics across config, MCP servers, skills, commands, hooks, and plugins.
 2. **Eight troubleshooting skills** — teach an agent how to locate and fix each surface, plus a venv guide.
@@ -83,6 +83,8 @@ Each installed skill is also available as a slash command (e.g. `/hermes-configu
 | `diagnosing-cli-tui` | CLI/TUI issues on native Windows — rendering artifacts, themes, busy indicators, mouse modes, encoding, launch/resume |
 
 ## Design principle
+
+**Complement, don't duplicate.** When a built-in (`hermes doctor`, `hermes verify`, per-surface helpers) already answers the question, use it — hermes-guide exists for the gaps: deep per-surface troubleshooting playbooks, deterministic read-only health checks, and the routing map between surfaces. If a check here ever starts duplicating a built-in, the built-in wins and the check gets trimmed.
 
 Every diagnosis resolves to a concrete action: a `hermes <subcommand>` command or a specific file + field edit, then a `/reload-*` or restart to apply.
 
