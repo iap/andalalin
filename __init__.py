@@ -1,5 +1,8 @@
 """hermes-guide plugin — executable, read-only Hermes configuration diagnostics.
 
+Complements Hermes's built-in diagnostics (hermes doctor / hermes verify) —
+it covers what they don't; it does not replace them.
+
 Exposes:
   - `/hermes-doctor`  slash command  (CLI + gateway sessions)
   - `hermes guide <scope>`  CLI subcommand  (terminal; exit 1 on broken or unknown)
@@ -11,7 +14,7 @@ Opt-in `proactive: true` runs drift checks on session start/end and logs
 findings (observer-only; nothing is injected or modified).
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 import logging
 import sys
