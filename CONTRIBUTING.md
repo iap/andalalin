@@ -4,7 +4,7 @@ Thank you for your interest in contributing to hermes-guide!
 
 ## What this project is
 
-hermes-guide is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin + skills tap. The plugin (`plugin.yaml` + `__init__.py`/`checks.py`/`constants.py`) ships read-only diagnostics (`/hermes-doctor` and `hermes guide`), and the `skills/` directory bundles six SKILL.md files that teach configuration and troubleshooting for MCP, skills, commands, hooks, and plugins.
+hermes-guide is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin + skills tap. The plugin (`plugin.yaml` + `__init__.py`/`checks.py`/`constants.py`) ships read-only diagnostics (`/hermes-doctor` and `hermes guide`), and the `skills/` directory bundles nine SKILL.md files that teach configuration and troubleshooting for MCP, skills, commands, hooks, plugins, hub auth, paths/venvs, and the Windows CLI/TUI.
 
 ## Reporting Issues
 
@@ -61,7 +61,7 @@ Examples:
 2. Create a feature branch (`git checkout -b fix/diagnosing-mcp-oauth`).
 3. Edit or add SKILL.md files under `skills/<name>/`, and/or the plugin files (`plugin.yaml`, `__init__.py`, `checks.py`, `constants.py`).
 4. Verify frontmatter parses (valid YAML between `---` fences, `name`, `description`, `version`).
-5. Run `python -m py_compile __init__.py checks.py constants.py` and `hermes plugins doctor . --ci`.
+5. Run `python -m py_compile __init__.py checks.py constants.py`, `hermes plugins doctor . --ci`, and the guard linters + regression tests in `tools/` (see the checklist in [AGENTS.md](AGENTS.md)).
 6. Cross-check every `hermes <subcommand>` reference against the installed Hermes docs or `--help` output.
 7. Commit with a descriptive message and open a pull request.
 
