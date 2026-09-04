@@ -21,20 +21,20 @@ hermes plugins install iap/hermes-guide --ref <40-char-SHA> --enable
 
 ### Manual install
 
-Alternatively, copy this repo into your Hermes plugins directory:
+Alternatively, clone this repo directly into your Hermes plugins directory:
 
 ```bash
 # POSIX / WSL: $HERMES_HOME is ~/.hermes
-cp -r . ~/.hermes/plugins/hermes-guide/
+git clone --depth 1 https://github.com/iap/hermes-guide ~/.hermes/plugins/hermes-guide
 hermes plugins enable hermes-guide
 ```
 
-On native Windows `$HERMES_HOME` is `%LOCALAPPDATA%\hermes` (not `~/.hermes`); run `hermes config path` to confirm.
+A clone (rather than `cp -r .`) keeps VCS metadata and local caches out of the plugin directory. On native Windows `$HERMES_HOME` is `%LOCALAPPDATA%\hermes` (not `~/.hermes`); run `hermes config path` to confirm.
 
 ## Usage
 
 - In a session: `/hermes-doctor` (all surfaces) or `/hermes-doctor mcp` (one surface).
-- In a terminal: `hermes guide` — exits `1` if any surface is broken or unknown (indeterminate).
+- In a terminal: `hermes guide` — exits `1` if any surface is broken or unknown (indeterminate), and `2` for an unrecognized scope name.
 
 ### Proactive mode (opt-in)
 
