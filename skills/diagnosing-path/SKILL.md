@@ -1,7 +1,7 @@
 ---
 name: diagnosing-path
 description: "Diagnose Hermes Agent path issues — the dual-venv layout (.venv/venv), how to detect which venv is active, the canonical resolution order, and best practices for code, scripts, and documentation that reference paths."
-version: 1.1.0
+version: 1.1.1
 metadata:
   hermes:
     tags: [hermes, path, venv, python, troubleshooting, guide]
@@ -72,7 +72,11 @@ if ($env:VIRTUAL_ENV) {
 from pathlib import Path
 
 def find_venv_dirs(project_root: Path) -> list[Path]:
-    """Return existing venv directories in resolution order."""
+    """Return existing venv directories in resolution order.
+
+    Stricter than the upstream resolver: this lists only *valid* venvs
+    (pyvenv.cfg required), while project_venv_dir() accepts is_dir() alone.
+    """
     candidates = [project_root / "venv", project_root / ".venv"]
     return [c for c in candidates if c.is_dir() and (c / "pyvenv.cfg").exists()]
 ```
