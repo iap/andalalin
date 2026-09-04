@@ -18,9 +18,11 @@ FOREIGN_MCP_KEYS = ("mcpServers",)
 MCP_STDIO_KEY = "command"
 MCP_HTTP_KEY = "url"
 
-# MCP facts that drift across Hermes versions (source: tools/mcp_tool.py).
-# Verified 2026-09 against Hermes v0.21.0 (commit 63279301). These are checked
-# against upstream by tools/check_upstream_drift.py (DRIFT_FACTS) — update them
+# MCP facts that drift across Hermes versions. Verified 2026-09 against Hermes
+# v0.21.0 (commit 63279301). Upstream sources: tools/mcp_tool.py through
+# v2026.8.31; after the 2026-09 refactor, tools/mcp_tool_schema.py (prefix) and
+# tools/mcp_tool_common.py (tool-call timeout). These are checked against
+# upstream main by tools/check_upstream_drift.py (DRIFT_FACTS) — update them
 # here and in skills/diagnosing-mcp/SKILL.md together when they change upstream.
 MCP_TOOL_NAME_PREFIX = "mcp__"       # native MCP tool-name prefix: mcp__<server>__<tool>
 MCP_TIMEOUT_DEFAULT = 300            # per-tool-call timeout default, seconds

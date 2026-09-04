@@ -46,22 +46,25 @@ import constants  # noqa: E402  (repo-root single source of truth)
 # ground truth). The watched files above cover *schema* drift; this covers *fact*
 # drift in files we intentionally do not watch whole (mcp_tool*.py, config.py).
 #
-# Paths/patterns are anchored to upstream MAIN. Upstream's 2026-09 refactor wave
-# moved MCP_TOOL_NAME_PREFIX from tools/mcp_tool.py to tools/mcp_tool_schema.py
-# and removed the docstring comment that anchored the per-tool-call timeout
-# default (still 300s in the pinned release and the diagnosing-mcp skill); that
-# fact is dropped until a stable main-side anchor exists — re-add it then.
+# Paths/patterns are anchored to upstream MAIN: the 2026-09 refactor split
+# tools/mcp_tool.py into mcp_tool_*.py siblings (tools/mcp_tool_schema.py now
+# defines MCP_TOOL_NAME_PREFIX, tools/mcp_tool_common.py the tool-call timeout),
+# so each fact targets the file that defines it there.
 DRIFT_FACTS = [
     ("MCP tool-name prefix", "tools/mcp_tool_schema.py",
      r'MCP_TOOL_NAME_PREFIX\s*=\s*"([^"]+)"', constants.MCP_TOOL_NAME_PREFIX),
+    ("MCP per-tool-call timeout default (s)", "tools/mcp_tool_common.py",
+     r'_DEFAULT_TOOL_TIMEOUT\s*=\s*(\d+)', str(constants.MCP_TIMEOUT_DEFAULT)),
     ("MCP connect_timeout default (s)", "tools/mcp_tool.py",
      r'_DEFAULT_CONNECT_TIMEOUT\s*=\s*(\d+)', str(constants.MCP_CONNECT_TIMEOUT_DEFAULT)),
     ("MCP config key", "hermes_cli/config.py",
      r'"(mcp_servers)"', constants.CONFIG_MCP_SERVERS),
     # Tuple-shaped so it matches both the loop form (for name in (...):) and the
-    # next()-generator form upstream's simplify wave produced.
+    # next()-generator form. The tempered dot (?:(?!\n\ndef ).) never crosses a
+    # top-level def, so the tuple must come from project_venv_dir() itself — a
+    # same-shaped tuple in a later function cannot mask a resolver change.
     ("project_venv_dir() candidate order (venv wins when both exist)", "hermes_constants.py",
-     r"(?s)def project_venv_dir\(.*?\(((?:'|\")venv(?:'|\"),\s*(?:'|\")\.venv(?:'|\"))\)",
+     r"(?s)def project_venv_dir\((?:(?!\n\ndef ).)*?\(((?:'|\")venv(?:'|\"),\s*(?:'|\")\.venv(?:'|\"))\)",
      constants.PROJECT_VENV_ORDER),
 ]
 
@@ -106,6 +109,9 @@ def verify_facts(repo_dir: str, head: str) -> list[str]:
             mismatches.append(f"{label}: pattern not found in upstream {path}")
             continue
         actual = m.group(1)
+        # A quote-style-only reformat (e.g. "venv" -> 'venv') is not drift.
+        if "'" in actual:
+            actual = actual.replace("'", '"')
         if actual != expected:
             mismatches.append(
                 f"{label}: upstream now `{actual}`, hermes-guide asserts `{expected}` "
@@ -150,26 +156,27 @@ def latest_upstream_tag() -> str | None:
     return max(tags, key=_tag_key) if tags else None
 
 
-def verify_ci_pin() -> list[str]:
+def verify_ci_pin() -> tuple[list[str], str | None]:
     """Flag the ci.yml install pin when upstream has published a newer tag.
 
-    The pinned install is what CI validates the skill facts against; if it
-    recedes from upstream, drift can land unnoticed between the pin and what
-    users actually run.
+    Returns (mismatches, error). *error* is set when the check itself could
+    not run (unreadable pin, ls-remote failure). Infrastructure trouble must
+    fail the run — never flow into a drift issue: the canonical title would
+    then dedup away the next run's real alert.
     """
     pinned = read_pinned_tag()
     if not pinned:
-        return ["CI install pin: could not read the pinned tag from .github/workflows/ci.yml"]
+        return [], "could not read the pinned tag from .github/workflows/ci.yml"
     latest = latest_upstream_tag()
-    if not latest:
-        return ["CI install pin: could not list upstream tags (git ls-remote failed)"]
+    if latest is None:
+        return [], "could not list upstream tags (git ls-remote failed)"
     if _tag_key(latest) > _tag_key(pinned):
         return [
             f"CI install pin: ci.yml installs `{pinned}` but upstream's latest tag is "
             f"`{latest}` — bump the pin in `.github/workflows/ci.yml` and re-verify "
             "constants.py / the SKILL.md facts against that tag."
-        ]
-    return []
+        ], None
+    return [], None
 
 
 def main() -> int:
@@ -187,9 +194,18 @@ def main() -> int:
         return 1
 
     fact_mismatches = verify_facts(repo_dir, head)
-    pin_mismatches = verify_ci_pin()
+    pin_mismatches, pin_error = verify_ci_pin()
 
     if not log and not fact_mismatches and not pin_mismatches:
+        if pin_error:
+            # Infrastructure failure, not drift: fail the run (visible in
+            # Actions) but never open the canonical-titled issue — a false
+            # issue would dedup away the next run's real alert.
+            print(
+                f"ERROR: install-pin check failed ({pin_error}); no drift findings to report.",
+                file=sys.stderr,
+            )
+            return 1
         print(
             f"No drift: watched files unchanged, facts verified, install pin current "
             f"(baseline {base[:7]}, HEAD {head[:7]})."
@@ -210,6 +226,11 @@ def main() -> int:
     if pin_mismatches:
         sections.append(
             "## CI install pin behind upstream\n\n" + "\n".join(f"- {m}" for m in pin_mismatches)
+        )
+    if pin_error:
+        sections.append(
+            f"Install-pin freshness could not be verified this cycle ({pin_error}) — "
+            "re-run the workflow when the network is healthy."
         )
     sections.append(
         f"Compare: https://github.com/{UPSTREAM_REPO}/compare/{base[:7]}...{head[:7]}\n\n"
