@@ -76,7 +76,9 @@ def _run_cli(args):
 
 def _setup_cli(subparser):
     subparser.add_argument(
-        "scope", nargs="?", help="optional filter: config|mcp|skills|commands|hooks|plugins"
+        "scope",
+        nargs="?",
+        help="optional filter: " + "|".join(checks.labels()),
     )
 
 
