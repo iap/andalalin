@@ -70,7 +70,8 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 > **Don't guess hook event names**. The valid set lives in `hermes_cli/plugins.py:VALID_HOOKS` and grows across releases — verify against the installed source rather than a hardcoded count.
 
 > [!NOTE]
-> **Don't hardcode `venv/` paths**. The project uses `.venv` as the canonical venv name (uv's default); `venv` is a legacy fallback. Both can coexist — `.venv` wins. See the `diagnosing-path` skill for detection patterns, canonical resolution order, and cross-platform best practices.
+> **Don't hardcode venv paths**. Hermes has a dual-venv layout: `venv/` (created by installers) and `.venv/` (uv's default) can coexist. Upstream's `project_venv_dir()` in `hermes_constants.py` resolves `venv` first — when both exist, `venv` wins. Resolve via `project_venv_dir()` / `venv_bin_dir()` from `hermes_constants.py`, or mirror that order; never assume either name. See the `diagnosing-path` skill for detection patterns, canonical resolution order, and cross-platform best practices.
+
 ### Testing and validation
 
 There is no unit-test suite yet; CI enforces a syntax check and a plugin self-check. Before declaring work complete:

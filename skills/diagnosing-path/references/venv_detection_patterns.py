@@ -30,22 +30,27 @@ def active_venv_path() -> Optional[Path]:
 
 def find_venv_dirs(project_root: Path) -> list[Path]:
     """Return existing venv directories in canonical resolution order.
-    
-    Checks `.venv` (uv default, canonical) first, then `venv` (legacy).
+
+    Checks `venv` (installer default) first, then `.venv` (uv default) —
+    mirroring hermes_constants.py::project_venv_dir, which resolves
+    `venv` before `.venv` ("venv wins when both exist").
     """
-    candidates = [project_root / ".venv", project_root / "venv"]
+    candidates = [project_root / "venv", project_root / ".venv"]
     return [c for c in candidates if c.is_dir() and (c / "pyvenv.cfg").exists()]
 
 
 def resolve_venv(project_root: Optional[Path] = None) -> Optional[Path]:
     """Resolve the active or canonical venv for a Hermes Agent checkout.
-    
+
     Resolution order:
     1. VIRTUAL_ENV environment variable (if set and valid)
     2. sys.prefix (if running inside a venv inside the project)
-    3. .venv/ (uv default, canonical)
-    4. venv/ (legacy fallback)
+    3. venv/ (installer default — project_venv_dir() resolves this first)
+    4. .venv/ (uv default)
     5. None (system Python, no venv)
+
+    Prefer importing project_venv_dir() from hermes_constants when Hermes
+    core is importable; this replica is for use outside the checkout.
     """
     # 1. Explicit override
     env_venv = os.environ.get("VIRTUAL_ENV")
@@ -60,9 +65,9 @@ def resolve_venv(project_root: Optional[Path] = None) -> Optional[Path]:
         if prefix is not None:
             return prefix
 
-    # 3 & 4. Check project root candidates
+    # 3 & 4. Check project root candidates — venv first, matching upstream
     root = project_root or Path.cwd()
-    for name in (".venv", "venv"):
+    for name in ("venv", ".venv"):
         candidate = root / name
         if candidate.is_dir() and (candidate / "pyvenv.cfg").exists():
             return candidate
