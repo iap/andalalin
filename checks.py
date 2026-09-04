@@ -642,6 +642,11 @@ _CHECKS = [
 ]
 
 
+def labels():
+    """Return the valid check labels in report order (scope validation + CLI help)."""
+    return [label for label, _ in _CHECKS]
+
+
 def run_all(scope=None):
     """Run every check, or exactly the one named by ``scope``.
 
@@ -654,7 +659,7 @@ def run_all(scope=None):
     ``s`` silently run four checks and a typo report success.
     """
     _cache.clear()
-    valid = [label for label, _ in _CHECKS]
+    valid = labels()
     if scope is not None and scope not in valid:
         raise ValueError(f"unknown scope {scope!r}; valid scopes: {', '.join(valid)}")
     results = {}

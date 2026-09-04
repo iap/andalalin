@@ -4,23 +4,25 @@ Instructions for AI coding agents working in this repository.
 
 ## Project Overview
 
-**hermes-guide** is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) **plugin + skills tap**. The plugin (`plugin.yaml` + `__init__.py`/`checks.py`/`constants.py`) exposes read-only diagnostics (`/hermes-doctor` and `hermes guide`), and the `skills/` directory bundles six SKILL.md files that teach agents and users how to configure and troubleshoot MCP servers, commands, skills, hooks, and plugins.
+**hermes-guide** is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) **plugin + skills tap**. The plugin (`plugin.yaml` + `__init__.py`/`checks.py`/`constants.py`) exposes read-only diagnostics (`/hermes-doctor` and `hermes guide`), and the `skills/` directory bundles nine SKILL.md files that teach agents and users how to configure and troubleshoot MCP servers, skills, commands, hooks, plugins, hub auth, paths/venvs, and the Windows CLI/TUI.
 
-Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `hermes plugins enable hermes-guide`) and the tap (`hermes skills tap add iap/hermes-guide`).
+Two install paths: the plugin (`hermes plugins install iap/hermes-guide --enable`, or a git clone into `~/.hermes/plugins/hermes-guide/` + `hermes plugins enable hermes-guide`) and the tap (`hermes skills tap add iap/hermes-guide`).
 
 ## Repository Structure
 
 | Path | Purpose |
 |---|---|
 | `plugin.yaml` | Plugin manifest (name, version, config schema) |
-| `__init__.py` | Plugin entrypoint — registers `/hermes-doctor` and `hermes guide` (the six skills ship separately via the skills tap) |
+| `__init__.py` | Plugin entrypoint — registers `/hermes-doctor` and `hermes guide` (the nine skills ship separately via the skills tap) |
 | `checks.py` | The six read-only health checks (config/mcp/skills/commands/hooks/plugins) |
 | `constants.py` | Single source of truth for names/values that drift across Hermes versions |
-| `skills/*/SKILL.md` | The six skills (one map + five diagnostics) |
+| `skills/*/SKILL.md` | The nine skills (one map + eight diagnostics) |
+| `tools/` | Guard linters (no-mutation, self-claim, version bump, upstream drift) + regression tests, all run by CI |
 | `README.md` | Plugin + tap overview, install instructions, skill table |
 | `AGENTS.md` | This file — agent instructions for working on the repo |
 | `CLAUDE.md` | `@AGENTS.md` import (Claude Code entry point) |
-| `.github/workflows/ci.yml` | CI — `py_compile` + `hermes plugins doctor . --ci` |
+| `.github/workflows/ci.yml` | CI — py_compile, mypy, `hermes plugins doctor . --ci`, guard linters, regression tests, bandit |
+| `.github/workflows/upstream-drift.yml` | Weekly upstream drift watch (`tools/check_upstream_drift.py`) — opens an issue when Hermes changes watched schema files or drift-prone facts |
 | `CONTRIBUTING.md` | Contribution guidelines |
 | `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1 |
 | `SECURITY.md` | Security policy |
@@ -70,10 +72,20 @@ Two install paths: the plugin (`cp -r . ~/.hermes/plugins/hermes-guide/` + `herm
 > **Don't guess hook event names**. The valid set lives in `hermes_cli/plugins.py:VALID_HOOKS` and grows across releases — verify against the installed source rather than a hardcoded count.
 
 > [!NOTE]
-> **Don't hardcode `venv/` paths**. The project uses `.venv` as the canonical venv name (uv's default); `venv` is a legacy fallback. Both can coexist — `.venv` wins. See the `diagnosing-path` skill for detection patterns, canonical resolution order, and cross-platform best practices.
+> **Don't hardcode venv paths**. Hermes has a dual-venv layout: `venv/` (created by installers) and `.venv/` (uv's default) can coexist. Upstream's `project_venv_dir()` in `hermes_constants.py` resolves `venv` first — when both exist, `venv` wins. Resolve via `project_venv_dir()` / `venv_bin_dir()` from `hermes_constants.py`, or mirror that order; never assume either name. See the `diagnosing-path` skill for detection patterns, canonical resolution order, and cross-platform best practices.
+
 ### Testing and validation
 
-There is no unit-test suite yet; CI enforces a syntax check and a plugin self-check. Before declaring work complete:
+CI enforces a syntax check, mypy, the plugin self-check, the `tools/` guard linters, and the `tools/` regression suite. Before declaring work complete:
+
+1. Run `python -m py_compile __init__.py checks.py constants.py`.
+2. Run `hermes plugins doctor . --ci` from the repo root.
+3. Run the guard linters and regression tests: `python tools/check_no_mutation.py --selftest && python tools/check_no_mutation.py && python tools/check_self_claim.py`, then every `python tools/test_*.py`.
+4. If you changed a `SKILL.md`, its `version` frontmatter must be bumped (`tools/check_skill_version_bump.py` enforces this against the merge base).
+5. Read each changed SKILL.md back and confirm YAML frontmatter parses cleanly (three dashes, valid keys, no tab indentation in YAML).
+6. Cross-check every `hermes <subcommand>` reference against the installed Hermes docs or `--help` output.
+7. Verify `$HERMES_HOME` paths are correct for both POSIX and Windows.
+8. State what was checked, what passed, and what was skipped.
 
 Beyond the CI gates, smoke-test the *model-facing* behavior with a one-shot run — this verifies discovery AND that the skill's instructions are actually followed:
 

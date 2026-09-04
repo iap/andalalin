@@ -1,5 +1,5 @@
 name: hermes-guide
-version: 0.2.2
+version: 0.2.3
 description: >-
   Executable, read-only diagnostics for Hermes configuration. Complements the
   built-in doctor/helpers: deterministic health checks across MCP servers,

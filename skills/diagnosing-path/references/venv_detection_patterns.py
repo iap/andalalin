@@ -29,23 +29,35 @@ def active_venv_path() -> Optional[Path]:
 
 
 def find_venv_dirs(project_root: Path) -> list[Path]:
-    """Return existing venv directories in canonical resolution order.
-    
-    Checks `.venv` (uv default, canonical) first, then `venv` (legacy).
+    """Return existing venv directories in resolution order.
+
+    Checks `venv` (installer default) first, then `.venv` (uv default) —
+    mirroring hermes_constants.py::project_venv_dir, which resolves
+    `venv` before `.venv` ("venv wins when both exist"). The pyvenv.cfg
+    filter here is deliberately stricter than the upstream resolver: this
+    function lists only *valid* venvs.
     """
-    candidates = [project_root / ".venv", project_root / "venv"]
+    candidates = [project_root / "venv", project_root / ".venv"]
     return [c for c in candidates if c.is_dir() and (c / "pyvenv.cfg").exists()]
 
 
 def resolve_venv(project_root: Optional[Path] = None) -> Optional[Path]:
     """Resolve the active or canonical venv for a Hermes Agent checkout.
-    
+
     Resolution order:
     1. VIRTUAL_ENV environment variable (if set and valid)
     2. sys.prefix (if running inside a venv inside the project)
-    3. .venv/ (uv default, canonical)
-    4. venv/ (legacy fallback)
+    3. venv/ (installer default — project_venv_dir() resolves this first)
+    4. .venv/ (uv default)
     5. None (system Python, no venv)
+
+    Prefer importing project_venv_dir() from hermes_constants when Hermes
+    core is importable; this replica is for use outside the checkout.
+    Steps 1-2 add pyvenv.cfg validation (this replica's own robustness
+    check); steps 3-4 mirror project_venv_dir() exactly — is_dir() alone,
+    no manifest check — so this function and Hermes can never disagree on
+    a dual-layout checkout (an empty stray directory wins the same way it
+    does upstream).
     """
     # 1. Explicit override
     env_venv = os.environ.get("VIRTUAL_ENV")
@@ -60,11 +72,12 @@ def resolve_venv(project_root: Optional[Path] = None) -> Optional[Path]:
         if prefix is not None:
             return prefix
 
-    # 3 & 4. Check project root candidates
+    # 3 & 4. Check project root candidates — venv first, is_dir() only,
+    # mirroring project_venv_dir() exactly
     root = project_root or Path.cwd()
-    for name in (".venv", "venv"):
+    for name in ("venv", ".venv"):
         candidate = root / name
-        if candidate.is_dir() and (candidate / "pyvenv.cfg").exists():
+        if candidate.is_dir():
             return candidate
 
     # 5. No venv found

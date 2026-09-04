@@ -7,9 +7,11 @@ names. When `NousResearch/hermes-agent` changes the files that define that schem
 plugin can silently go stale.
 
 This script diffs the watched schema files between a stored baseline commit
-(`.github/upstream-drift.baseline`) and upstream HEAD, and files one GitHub issue on this
-repo listing the drift. It deduplicates (skips) if a drift issue is already open, and
-tells the reviewer to bump the baseline afterward. Runs in CI via
+(`.github/upstream-drift.baseline`) and upstream HEAD, asserts drift-prone facts
+(`DRIFT_FACTS`) and the CI install pin (`.github/workflows/ci.yml`) against
+upstream, and files one GitHub issue on this repo listing the drift. It
+deduplicates (skips) if a drift issue is already open, and tells the reviewer to
+bump the baseline afterward. Runs in CI via
 `.github/workflows/upstream-drift.yml` (weekly + manual).
 
 Requires `git` + the `gh` CLI (both preinstalled on GitHub-hosted runners).
@@ -26,9 +28,11 @@ UPSTREAM_REPO = os.environ.get("UPSTREAM_REPO", "NousResearch/hermes-agent")
 WATCH_FILES = os.environ.get(
     "WATCH_FILES",
     "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py "
-    "skills/autonomous-ai-agents/hermes-agent",
+    "agent/skill_bundles.py agent/skill_commands.py tools/skills_hub.py "
+    "hermes_constants.py skills/autonomous-ai-agents/hermes-agent",
 ).split()
 BASELINE_FILE = Path(".github/upstream-drift.baseline")
+CI_WORKFLOW = Path(".github/workflows/ci.yml")
 ISSUE_TITLE = "Upstream schema drift detected — review checks.py"
 CLONE_DIR = "/tmp/hermes-agent-upstream"
 
@@ -40,16 +44,28 @@ import constants  # noqa: E402  (repo-root single source of truth)
 # Facts that drift across Hermes versions. Each tuple: (label, upstream path,
 # extraction regex with one capture group, the hermes-guide constant asserting
 # ground truth). The watched files above cover *schema* drift; this covers *fact*
-# drift in files we intentionally do not watch whole (mcp_tool.py, config.py).
+# drift in files we intentionally do not watch whole (mcp_tool*.py, config.py).
+#
+# Paths/patterns are anchored to upstream MAIN: the 2026-09 refactor split
+# tools/mcp_tool.py into mcp_tool_*.py siblings (tools/mcp_tool_schema.py now
+# defines MCP_TOOL_NAME_PREFIX, tools/mcp_tool_common.py the tool-call timeout),
+# so each fact targets the file that defines it there.
 DRIFT_FACTS = [
-    ("MCP tool-name prefix", "tools/mcp_tool.py",
+    ("MCP tool-name prefix", "tools/mcp_tool_schema.py",
      r'MCP_TOOL_NAME_PREFIX\s*=\s*"([^"]+)"', constants.MCP_TOOL_NAME_PREFIX),
-    ("MCP per-tool-call timeout default (s)", "tools/mcp_tool.py",
-     r'per-tool-call timeout in seconds \(default:\s*(\d+)\)', str(constants.MCP_TIMEOUT_DEFAULT)),
+    ("MCP per-tool-call timeout default (s)", "tools/mcp_tool_common.py",
+     r'_DEFAULT_TOOL_TIMEOUT\s*=\s*(\d+)', str(constants.MCP_TIMEOUT_DEFAULT)),
     ("MCP connect_timeout default (s)", "tools/mcp_tool.py",
      r'_DEFAULT_CONNECT_TIMEOUT\s*=\s*(\d+)', str(constants.MCP_CONNECT_TIMEOUT_DEFAULT)),
     ("MCP config key", "hermes_cli/config.py",
      r'"(mcp_servers)"', constants.CONFIG_MCP_SERVERS),
+    # Tuple-shaped so it matches both the loop form (for name in (...):) and the
+    # next()-generator form. The tempered dot (?:(?!\n\ndef ).) never crosses a
+    # top-level def, so the tuple must come from project_venv_dir() itself — a
+    # same-shaped tuple in a later function cannot mask a resolver change.
+    ("project_venv_dir() candidate order (venv wins when both exist)", "hermes_constants.py",
+     r"(?s)def project_venv_dir\((?:(?!\n\ndef ).)*?\(((?:'|\")venv(?:'|\"),\s*(?:'|\")\.venv(?:'|\"))\)",
+     constants.PROJECT_VENV_ORDER),
 ]
 
 
@@ -93,12 +109,74 @@ def verify_facts(repo_dir: str, head: str) -> list[str]:
             mismatches.append(f"{label}: pattern not found in upstream {path}")
             continue
         actual = m.group(1)
+        # A quote-style-only reformat (e.g. "venv" -> 'venv') is not drift.
+        if "'" in actual:
+            actual = actual.replace("'", '"')
         if actual != expected:
             mismatches.append(
                 f"{label}: upstream now `{actual}`, hermes-guide asserts `{expected}` "
                 "(update constants.py and the matching SKILL.md)"
             )
     return mismatches
+
+
+def read_pinned_tag() -> str | None:
+    """The Hermes tag CI installs (`git clone --branch <tag>` in ci.yml), or None."""
+    try:
+        text = CI_WORKFLOW.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.search(r"git clone --depth 1 --branch (\S+) ", text)
+    return m.group(1) if m else None
+
+
+def _tag_key(tag: str) -> tuple[int, ...]:
+    """Sort key for CalVer tags like v2026.8.16 / v2026.8.16.2."""
+    return tuple(int(p) if p.isdigit() else 0 for p in tag.lstrip("v").split("."))
+
+
+def latest_upstream_tag() -> str | None:
+    """Latest `v*` tag on upstream via ls-remote (no tag fetch into the clone)."""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-remote", "--tags",
+             f"https://github.com/{UPSTREAM_REPO}.git", "refs/tags/v*"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    tags = []
+    for line in proc.stdout.splitlines():
+        ref = line.split("refs/tags/", 1)[-1].strip()
+        if ref.endswith("^{}") or not ref.startswith("v"):
+            continue
+        tags.append(ref)
+    return max(tags, key=_tag_key) if tags else None
+
+
+def verify_ci_pin() -> tuple[list[str], str | None]:
+    """Flag the ci.yml install pin when upstream has published a newer tag.
+
+    Returns (mismatches, error). *error* is set when the check itself could
+    not run (unreadable pin, ls-remote failure). Infrastructure trouble must
+    fail the run — never flow into a drift issue: the canonical title would
+    then dedup away the next run's real alert.
+    """
+    pinned = read_pinned_tag()
+    if not pinned:
+        return [], "could not read the pinned tag from .github/workflows/ci.yml"
+    latest = latest_upstream_tag()
+    if latest is None:
+        return [], "could not list upstream tags (git ls-remote failed)"
+    if _tag_key(latest) > _tag_key(pinned):
+        return [
+            f"CI install pin: ci.yml installs `{pinned}` but upstream's latest tag is "
+            f"`{latest}` — bump the pin in `.github/workflows/ci.yml` and re-verify "
+            "constants.py / the SKILL.md facts against that tag."
+        ], None
+    return [], None
 
 
 def main() -> int:
@@ -116,11 +194,21 @@ def main() -> int:
         return 1
 
     fact_mismatches = verify_facts(repo_dir, head)
+    pin_mismatches, pin_error = verify_ci_pin()
 
-    if not log and not fact_mismatches:
+    if not log and not fact_mismatches and not pin_mismatches:
+        if pin_error:
+            # Infrastructure failure, not drift: fail the run (visible in
+            # Actions) but never open the canonical-titled issue — a false
+            # issue would dedup away the next run's real alert.
+            print(
+                f"ERROR: install-pin check failed ({pin_error}); no drift findings to report.",
+                file=sys.stderr,
+            )
+            return 1
         print(
-            f"No drift: watched files unchanged and facts verified since baseline "
-            f"{base[:7]} (HEAD {head[:7]})."
+            f"No drift: watched files unchanged, facts verified, install pin current "
+            f"(baseline {base[:7]}, HEAD {head[:7]})."
         )
         return 0
 
@@ -134,6 +222,15 @@ def main() -> int:
     if fact_mismatches:
         sections.append(
             "## Fact drift\n\n" + "\n".join(f"- {m}" for m in fact_mismatches)
+        )
+    if pin_mismatches:
+        sections.append(
+            "## CI install pin behind upstream\n\n" + "\n".join(f"- {m}" for m in pin_mismatches)
+        )
+    if pin_error:
+        sections.append(
+            f"Install-pin freshness could not be verified this cycle ({pin_error}) — "
+            "re-run the workflow when the network is healthy."
         )
     sections.append(
         f"Compare: https://github.com/{UPSTREAM_REPO}/compare/{base[:7]}...{head[:7]}\n\n"

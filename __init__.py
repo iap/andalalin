@@ -14,7 +14,7 @@ Opt-in `proactive: true` runs drift checks on session start/end and logs
 findings (observer-only; nothing is injected or modified).
 """
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 import logging
 import sys
@@ -76,7 +76,9 @@ def _run_cli(args):
 
 def _setup_cli(subparser):
     subparser.add_argument(
-        "scope", nargs="?", help="optional filter: config|mcp|skills|commands|hooks|plugins"
+        "scope",
+        nargs="?",
+        help="optional filter: " + "|".join(checks.labels()),
     )
 
 
