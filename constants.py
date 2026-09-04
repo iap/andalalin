@@ -19,12 +19,18 @@ MCP_STDIO_KEY = "command"
 MCP_HTTP_KEY = "url"
 
 # MCP facts that drift across Hermes versions (source: tools/mcp_tool.py).
-# Verified 2026-08 against Hermes v0.20.4 (commit 13ce0c5). These are checked
+# Verified 2026-09 against Hermes v0.21.0 (commit 63279301). These are checked
 # against upstream by tools/check_upstream_drift.py (DRIFT_FACTS) — update them
 # here and in skills/diagnosing-mcp/SKILL.md together when they change upstream.
 MCP_TOOL_NAME_PREFIX = "mcp__"       # native MCP tool-name prefix: mcp__<server>__<tool>
 MCP_TIMEOUT_DEFAULT = 300            # per-tool-call timeout default, seconds
 MCP_CONNECT_TIMEOUT_DEFAULT = 60     # initial connection timeout default, seconds
+
+# Upstream project_venv_dir() candidate order (hermes_constants.py) — its
+# docstring: "``venv`` wins when both exist, matching what the installers
+# write." skills/diagnosing-path/SKILL.md and references/venv_detection_patterns.py
+# mirror this order; tools/check_upstream_drift.py asserts it against upstream.
+PROJECT_VENV_ORDER = '"venv", ".venv"'
 
 # Plugin sub-category directories that use their own discovery/selection keys
 # (memory.provider / context.engine / image_gen.provider / --provider) — NOT plugins.enabled.
