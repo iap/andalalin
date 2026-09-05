@@ -630,6 +630,149 @@ def check_plugins():
     return {"status": "healthy", "reason": "plugins consistent with enable list", "detail": sorted(enabled)}
 
 
+# --- memory ---------------------------------------------------------------
+
+_MEM_USER_LEAD = re.compile(
+    # "User <pref/identity-verb> …" reads as a user-profile fact; bare "User …"
+    # does not ("User authentication uses OAuth" is a legitimate agent note),
+    # so the profile keyword must follow "user" directly.
+    r"^\s*(?:the\s+)?user\s+"
+    r"(?:prefers?|wants?|likes?|dislikes?|hates?|loves?|identity|gets?|has|"
+    r"works?|rejects?|uses?|understands?|demands?|merges?|avoids?|tolerates?|"
+    r"expects?|does)\b",
+    re.IGNORECASE,
+)
+_MEM_DATE_LEAD = re.compile(r"^\s*\[\d{4}-\d{2}-\d{2}\]")
+_WS_NORM = re.compile(r"[\s\W_]+", re.UNICODE)
+
+
+def _mem_tokens(entry):
+    """Normalize an entry into a token set for near-duplicate comparison."""
+    return frozenset(_WS_NORM.split(_WS_NORM.sub(" ", entry.lower()).strip())) - {""}
+
+
+def _memory_limit(data, store):
+    """Return the configured char limit for a store (defaults mirror upstream)."""
+    mem_cfg = data.get(constants.CONFIG_MEMORY_SECTION) if isinstance(data, dict) else None
+    key = "memory_char_limit" if store == "MEMORY.md" else "user_char_limit"
+    default = constants.MEMORY_CHAR_LIMIT_DEFAULT if store == "MEMORY.md" else constants.USER_CHAR_LIMIT_DEFAULT
+    if isinstance(mem_cfg, dict):
+        value = mem_cfg.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    return default
+
+
+def check_memory_hygiene():
+    """Read-only hygiene audit of the built-in memory stores (MEMORY.md/USER.md).
+
+    Complements `hermes memory status` (which reports provider/store health)
+    with content-level findings: over-limit stores, exact/near-duplicate
+    entries, user-preference entries mis-targeted into the agent-notes store,
+    and an undated dynamic store. Never mutates anything.
+    """
+    home = _hermes_home()
+    if not home:
+        return {"status": "unknown", "reason": "cannot resolve $HERMES_HOME", "detail": None}
+    _, data = _read_config()
+
+    memories_dir = os.path.join(home, "memories")
+    broken = []
+    notes = []
+    missing = []
+    stores_present = 0
+
+    for store in constants.BUILTIN_MEMORY_STORES:
+        store_path = os.path.join(memories_dir, store)
+        if not os.path.isfile(store_path):
+            missing.append(store)
+            continue
+        stores_present += 1
+        try:
+            with open(store_path, "r", encoding="utf-8") as f:
+                text = f.read()
+        except Exception as exc:
+            broken.append(f"{store}: unreadable ({type(exc).__name__})")
+            continue
+
+        entries = [e.strip() for e in text.split(f"\n{constants.MEMORY_ENTRY_DELIMITER}\n") if e.strip()]
+        limit = _memory_limit(data, store)
+        size = len(text)
+
+        if size > limit:
+            broken.append(
+                f"{store}: {size}/{limit} chars — over limit; "
+                "writes will be rejected or evicted (consolidate: remove/merge stale entries)"
+            )
+        elif size > 0.85 * limit:
+            notes.append(f"{store}: {size}/{limit} chars — approaching limit")
+
+        # Exact duplicates (the tool's own rejection is exact-match, so these
+        # can only appear via replace/manual edits — still worth flagging).
+        exact_dups = sorted({e for e in entries if entries.count(e) > 1})
+        for e in exact_dups[:3]:
+            broken.append(f"{store}: exact duplicate entry ({e[:60]}…) — remove one copy")
+
+        # Near-duplicates: normalized token-set overlap on entries >20 chars.
+        tokenized = [(i, _mem_tokens(e)) for i, e in enumerate(entries) if len(e) > 20]
+        reported_pairs = set()
+        near_dups = 0
+        for a in range(len(tokenized)):
+            for b in range(a + 1, len(tokenized)):
+                ia, ta = tokenized[a]
+                ib, tb = tokenized[b]
+                if not ta or not tb:
+                    continue
+                overlap = len(ta & tb) / len(ta | tb)
+                if overlap >= 0.8 and (ia, ib) not in reported_pairs:
+                    reported_pairs.add((ia, ib))
+                    near_dups += 1
+                    if near_dups <= 3:
+                        notes.append(
+                            f"{store}: entries #{ia + 1} and #{ib + 1} are near-duplicates "
+                            f"({overlap:.0%} overlap) — merge into one"
+                        )
+        if near_dups > 3:
+            notes.append(f"{store}: {near_dups} near-duplicate pair(s) total")
+
+        # Mis-target: user-profile facts in the agent-notes store. Only checked
+        # on MEMORY.md — USER.md leading with "User" is correct, not a finding.
+        if store == "MEMORY.md":
+            mis_targets = [e for e in entries if _MEM_USER_LEAD.match(e)]
+            for e in mis_targets[:3]:
+                notes.append(
+                    f"{store}: entry reads like a user-profile fact ({e[:50]}…) — "
+                    "it belongs in USER.md (target=user), where it loads for every session too"
+                )
+            if len(mis_targets) > 3:
+                notes.append(f"{store}: {len(mis_targets)} user-profile entry(ies) total")
+
+        # Dynamic store benefits from entry dates (staleness tracking): report
+        # every undated entry, not just an all-undated store.
+        if store == "MEMORY.md" and entries:
+            undated = [e for e in entries if not _MEM_DATE_LEAD.match(e)]
+            if len(undated) == len(entries):
+                notes.append(
+                    f"{store}: no entry has a [YYYY-MM-DD] date prefix — "
+                    "dating entries makes staleness checkable"
+                )
+            elif undated:
+                notes.append(
+                    f"{store}: {len(undated)} of {len(entries)} entries lack a "
+                    "[YYYY-MM-DD] date prefix — dating entries makes staleness checkable"
+                )
+
+    if broken:
+        return {"status": "broken", "reason": f"{len(broken)} memory issue(s)", "detail": broken + notes}
+    if stores_present == 0:
+        return {"status": "healthy", "reason": "no memory files yet (nothing to audit)", "detail": memories_dir}
+    for store in missing:
+        notes.append(f"{store}: not created yet (Hermes creates it on first write)")
+    if notes:
+        return {"status": "informational", "reason": f"{len(notes)} memory note(s)", "detail": notes}
+    return {"status": "healthy", "reason": "memory stores within limits, no hygiene findings", "detail": memories_dir}
+
+
 # --- runner ---------------------------------------------------------------
 
 _CHECKS = [
@@ -639,6 +782,10 @@ _CHECKS = [
     ("commands", check_commands),
     ("hooks", check_hooks),
     ("plugins", check_plugins),
+    # Label is "memories" (the $HERMES_HOME/memories/ directory the check
+    # audits) — "memory" is reserved by constants.PLUGIN_SUBCATEGORY_DIRS and
+    # the F3 guard forbids it as a literal here.
+    ("memories", check_memory_hygiene),
 ]
 
 

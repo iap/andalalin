@@ -8,6 +8,11 @@ Do not scatter these strings across checks.py or __init__.py.
 # Top-level config key for MCP servers
 CONFIG_MCP_SERVERS = "mcp_servers"
 
+# Top-level config key for the built-in memory section (memory.provider,
+# memory.memory_char_limit, ...). Also a plugin sub-category dir name — the F3
+# guard forbids it as a literal in checks.py, so it lives here.
+CONFIG_MEMORY_SECTION = "memory"
+
 # Foreign keys that indicate a Claude-Code-style paste (silently NOT read by Hermes)
 # Top-level foreign key from a Claude-Code-style paste that Hermes silently ignores.
 # (Dropped the dead `"mcp.servers"` entry: `key in data` only matches top-level
@@ -33,6 +38,15 @@ MCP_CONNECT_TIMEOUT_DEFAULT = 60     # initial connection timeout default, secon
 # write." skills/diagnosing-path/SKILL.md and references/venv_detection_patterns.py
 # mirror this order; tools/check_upstream_drift.py asserts it against upstream.
 PROJECT_VENV_ORDER = '"venv", ".venv"'
+
+# Built-in memory stores (tools/memory_tool.py: get_memory_dir() -> $HERMES_HOME/memories/).
+# Entry delimiter and default char limits drift upstream — verified 2026-09
+# against hermes-agent commit 8d3745a99b (defaults in cli-config.yaml.example /
+# hermes_cli/config_defaults.py). check_memory_hygiene() in checks.py consumes these.
+BUILTIN_MEMORY_STORES = ("MEMORY.md", "USER.md")
+MEMORY_ENTRY_DELIMITER = "§"
+MEMORY_CHAR_LIMIT_DEFAULT = 2200
+USER_CHAR_LIMIT_DEFAULT = 1375
 
 # Plugin sub-category directories that use their own discovery/selection keys
 # (memory.provider / context.engine / image_gen.provider / --provider) — NOT plugins.enabled.

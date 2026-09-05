@@ -4,7 +4,7 @@
 
 Hermes usage and self-diagnosis guide for [Hermes Agent](https://github.com/NousResearch/hermes-agent). **It complements — not replaces — Hermes's built-in diagnostics** (`hermes doctor`, `hermes verify`, and the platform helpers): it is an extra layer covering what they don't. It ships two things:
 
-1. **A plugin** — `/hermes-doctor` (in-session) and `hermes guide` (terminal): read-only diagnostics across config, MCP servers, skills, commands, hooks, and plugins.
+1. **A plugin** — `/hermes-doctor` (in-session) and `hermes guide` (terminal): read-only diagnostics across config, MCP servers, skills, commands, hooks, plugins, and memory.
 2. **Ten troubleshooting skills** — teach an agent how to locate and fix each surface, plus venv, auth, and memory guides.
 
 ## Install the plugin
