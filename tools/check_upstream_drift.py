@@ -29,7 +29,8 @@ WATCH_FILES = os.environ.get(
     "WATCH_FILES",
     "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py "
     "agent/skill_bundles.py agent/skill_commands.py tools/skills_hub.py "
-    "hermes_constants.py skills/autonomous-ai-agents/hermes-agent",
+    "hermes_constants.py hermes_cli/config_defaults.py "
+    "skills/autonomous-ai-agents/hermes-agent",
 ).split()
 BASELINE_FILE = Path(".github/upstream-drift.baseline")
 CI_WORKFLOW = Path(".github/workflows/ci.yml")
