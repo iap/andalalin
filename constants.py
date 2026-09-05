@@ -42,7 +42,10 @@ PROJECT_VENV_ORDER = '"venv", ".venv"'
 # Built-in memory stores (tools/memory_tool.py: get_memory_dir() -> $HERMES_HOME/memories/).
 # Entry delimiter and default char limits drift upstream — verified 2026-09
 # against hermes-agent commit 8d3745a99b (defaults in cli-config.yaml.example /
-# hermes_cli/config_defaults.py). check_memory_hygiene() in checks.py consumes these.
+# hermes_cli/config_defaults.py). check_memory_hygiene() in checks.py consumes
+# these; tools/check_upstream_drift.py (DRIFT_FACTS) asserts the delimiter and
+# limits against upstream main, where the delimiter lives in
+# tools/memory_tool_store.py (moved there by the 2026-09 refactor).
 BUILTIN_MEMORY_STORES = ("MEMORY.md", "USER.md")
 MEMORY_ENTRY_DELIMITER = "§"
 MEMORY_CHAR_LIMIT_DEFAULT = 2200

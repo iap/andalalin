@@ -29,7 +29,8 @@ WATCH_FILES = os.environ.get(
     "WATCH_FILES",
     "hermes_cli/plugins.py tools/skills_tool.py agent/skill_utils.py "
     "agent/skill_bundles.py agent/skill_commands.py tools/skills_hub.py "
-    "hermes_constants.py skills/autonomous-ai-agents/hermes-agent",
+    "hermes_constants.py tools/memory_tool.py tools/memory_tool_store.py "
+    "hermes_cli/config_defaults.py skills/autonomous-ai-agents/hermes-agent",
 ).split()
 BASELINE_FILE = Path(".github/upstream-drift.baseline")
 CI_WORKFLOW = Path(".github/workflows/ci.yml")
@@ -66,6 +67,17 @@ DRIFT_FACTS = [
     ("project_venv_dir() candidate order (venv wins when both exist)", "hermes_constants.py",
      r"(?s)def project_venv_dir\((?:(?!\n\ndef ).)*?\(((?:'|\")venv(?:'|\"),\s*(?:'|\")\.venv(?:'|\"))\)",
      constants.PROJECT_VENV_ORDER),
+    # Memory facts (consumed by check_memory_hygiene). The delimiter regex
+    # matches both literal shapes upstream has used: escaped "\n§\n" (releases
+    # through v0.21.0, defined in tools/memory_tool.py) and the real-newline
+    # multi-line literal (main, since the tools/memory_tool_store.py split).
+    ("Memory entry delimiter (built-in stores)", "tools/memory_tool_store.py",
+     r'(?s)ENTRY_DELIMITER\s*=\s*"(?:\\n|\n)?(.)(?:\\n|\n)?"',
+     constants.MEMORY_ENTRY_DELIMITER),
+    ("MEMORY.md char limit default", "hermes_cli/config_defaults.py",
+     r'"memory_char_limit":\s*(\d+)', str(constants.MEMORY_CHAR_LIMIT_DEFAULT)),
+    ("USER.md char limit default", "hermes_cli/config_defaults.py",
+     r'"user_char_limit":\s*(\d+)', str(constants.USER_CHAR_LIMIT_DEFAULT)),
 ]
 
 
