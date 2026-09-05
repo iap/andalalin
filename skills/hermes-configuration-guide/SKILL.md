@@ -1,7 +1,7 @@
 ---
 name: hermes-configuration-guide
 description: Map of Hermes Agent configuration — where MCP servers, skills, commands, hooks, and plugins live, and which diagnostic skill to load when something does not work.
-version: 1.0.5
+version: 1.0.6
 metadata:
   hermes:
     tags: [hermes, configuration, troubleshooting]
@@ -41,6 +41,22 @@ Never guess where Hermes reads its files. The home directory differs by platform
 ## Key $HERMES_HOME inventory
 
 `config.yaml` (main config + `platforms:`/`gateway:` messaging settings) · `.env` (secrets; documented vars override config) · `gateway.json` (legacy gateway fallback) · `skills/` · `skill-bundles/` · `hooks/` (gateway hooks) · `agent-hooks/` (shell-hook script convention) · `plugins/` · `shell-hooks-allowlist.json` (shell-hook consent) · `mcp-tokens/` (OAuth caches) · `logs/` · `state.db` (sessions).
+
+## Orphaned & legacy settings
+
+Config keys that Hermes **silently stopped reading** are inert: they look meaningful in `config.yaml`, but no code consumes them — and their presence proves nothing. Before trusting a key, verify it against the installed source: search for actual readers (e.g. `grep -rn 'get("profile")' <hermes-agent-source>`), and check whether it appears in the shipped `cli-config.yaml.example` (the documented schema). Known cases, verified against installed Hermes v0.21.x (source commit `8d3745a99b`, 2026-09):
+
+| Setting | Status | Live replacement |
+|---|---|---|
+| `profile:` block in `config.yaml` (e.g. `profile.description`) | **Orphaned** — written by an older scheme, zero readers today | Per-profile `profile.yaml` metadata: `hermes profile describe <name> --text "…"` |
+| `mcpServers` (top-level, Claude-Code-style paste) | Silently not read | `mcp_servers:` |
+| `disabled:` inside an MCP server entry | Silently ignored (server stays enabled) | `enabled: false` |
+
+Notes:
+
+- `hermes migrate` covers **retired models only** (currently the xAI migration) — it does not detect arbitrary orphaned keys.
+- Profile descriptions reach a model in only two contexts: kanban task routing (the decomposer's profile roster) and dispatch guidance. Normal sessions and `hermes guide`/`hermes doctor` never see them.
+- When a diagnosis behaves as if part of `config.yaml` is invisible, audit for orphans before suspecting the model: inert keys produce exactly that symptom.
 
 ## Routing — when something is wrong
 
