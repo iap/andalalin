@@ -1,7 +1,7 @@
 ---
 name: diagnosing-memory
 description: "Diagnose Hermes memory problems — the agent forgot something, an external memory provider configured but silently unavailable, missing provider plugins or API keys, and built-in MEMORY.md/USER.md errors from config or char limits."
-version: 1.0.0
+version: 1.1.0
 metadata:
   hermes:
     tags: [hermes, memory, providers, troubleshooting, diagnosing]
@@ -56,6 +56,8 @@ Probe in this order — the first two are built-in helpers and answer most cases
 3. **Config + files** — read the `memory:` block of `$HERMES_HOME/config.yaml` (or `hermes config show`), and `ls "$HERMES_HOME/memories/"`. On native Windows `$HERMES_HOME` is `%LOCALAPPDATA%\hermes` — confirm with `hermes config path`, never assume.
 
 4. **Session log** — a provider selected but unavailable logs a one-shot warning at agent start ("Memory provider … reports unavailable — external memory is disabled for this session"): `hermes logs --follow` while starting a session.
+
+5. **`hermes guide memories`** (or `/hermes-doctor memories` in-session) — this plugin's read-only hygiene audit of the built-in stores: over-limit files, exact/near-duplicate entries, user-profile facts mis-targeted into `MEMORY.md`, and undated dynamic entries. It reports content-level findings that `hermes memory status` does not look at.
 
 ## 3. Pitfalls (symptom → cause → fix)
 

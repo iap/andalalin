@@ -1,10 +1,10 @@
 name: hermes-guide
-version: 0.2.3
+version: 0.3.0
 description: >-
   Executable, read-only diagnostics for Hermes configuration. Complements the
   built-in doctor/helpers: deterministic health checks across MCP servers,
-  skills, commands, hooks, and plugins + troubleshooting playbooks for what
-  they don't cover.
+  skills, commands, hooks, plugins, and memory + troubleshooting playbooks for
+  what they don't cover.
 manifest_version: 1
 api_version: 1
 license: MIT
