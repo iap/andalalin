@@ -24,7 +24,6 @@ Two install paths: the plugin (`hermes plugins install iap/hermes-guide --enable
 | `.github/workflows/ci.yml` | CI — py_compile, mypy, `hermes plugins doctor . --ci`, guard linters, regression tests, bandit |
 | `.github/workflows/upstream-drift.yml` | Weekly upstream drift watch (`tools/check_upstream_drift.py`) — opens an issue when Hermes changes watched schema files or drift-prone facts |
 | `CONTRIBUTING.md` | Contribution guidelines |
-| `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1 |
 | `SECURITY.md` | Security policy |
 | `LICENSE` | MIT License |
 
@@ -92,13 +91,6 @@ Beyond the CI gates, smoke-test the *model-facing* behavior with a one-shot run 
 ```bash
 hermes -z "Use the diagnosing-path skill: which interpreter should a script in the Hermes checkout use?"
 ```
-
-1. Run `python -m py_compile __init__.py checks.py constants.py`.
-2. Run `hermes plugins doctor . --ci` from the repo root.
-3. Read each changed SKILL.md back and confirm YAML frontmatter parses cleanly (three dashes, valid keys, no tab indentation in YAML).
-4. Cross-check every `hermes <subcommand>` reference against the installed Hermes docs or `--help` output.
-5. Verify `$HERMES_HOME` paths are correct for both POSIX and Windows.
-6. State what was checked, what passed, and what was skipped.
 
 ## Contributing
 
