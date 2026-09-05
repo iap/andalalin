@@ -68,11 +68,14 @@ DRIFT_FACTS = [
      r"(?s)def project_venv_dir\((?:(?!\n\ndef ).)*?\(((?:'|\")venv(?:'|\"),\s*(?:'|\")\.venv(?:'|\"))\)",
      constants.PROJECT_VENV_ORDER),
     # Memory facts (consumed by check_memory_hygiene). The delimiter regex
-    # matches both literal shapes upstream has used: escaped "\n§\n" (releases
-    # through v0.21.0, defined in tools/memory_tool.py) and the real-newline
-    # multi-line literal (main, since the tools/memory_tool_store.py split).
+    # requires a full newline (escaped or real — both literal shapes upstream
+    # has used) on EACH side of the captured character, matching "\n§\n"
+    # (releases through v0.21.0, tools/memory_tool.py) and the real-newline
+    # multi-line literal (main, tools/memory_tool_store.py). A bare "§" or a
+    # one-sided delimiter is drift: check_memory_hygiene() splits only on the
+    # exact "\n§\n" separator.
     ("Memory entry delimiter (built-in stores)", "tools/memory_tool_store.py",
-     r'(?s)ENTRY_DELIMITER\s*=\s*"(?:\\n|\n)?(.)(?:\\n|\n)?"',
+     r'(?s)ENTRY_DELIMITER\s*=\s*"(?:\\n|\n)(.)(?:\\n|\n)"',
      constants.MEMORY_ENTRY_DELIMITER),
     ("MEMORY.md char limit default", "hermes_cli/config_defaults.py",
      r'"memory_char_limit":\s*(\d+)', str(constants.MEMORY_CHAR_LIMIT_DEFAULT)),
