@@ -632,7 +632,16 @@ def check_plugins():
 
 # --- memory ---------------------------------------------------------------
 
-_MEM_USER_LEAD = re.compile(r"^\s*(?:the\s+)?user\b", re.IGNORECASE)
+_MEM_USER_LEAD = re.compile(
+    # "User <pref/identity-verb> …" reads as a user-profile fact; bare "User …"
+    # does not ("User authentication uses OAuth" is a legitimate agent note),
+    # so the profile keyword must follow "user" directly.
+    r"^\s*(?:the\s+)?user\s+"
+    r"(?:prefers?|wants?|likes?|dislikes?|hates?|loves?|identity|gets?|has|"
+    r"works?|rejects?|uses?|understands?|demands?|merges?|avoids?|tolerates?|"
+    r"expects?|does)\b",
+    re.IGNORECASE,
+)
 _MEM_DATE_LEAD = re.compile(r"^\s*\[\d{4}-\d{2}-\d{2}\]")
 _WS_NORM = re.compile(r"[\s\W_]+", re.UNICODE)
 
@@ -670,12 +679,13 @@ def check_memory_hygiene():
     memories_dir = os.path.join(home, "memories")
     broken = []
     notes = []
+    missing = []
     stores_present = 0
 
     for store in constants.BUILTIN_MEMORY_STORES:
         store_path = os.path.join(memories_dir, store)
         if not os.path.isfile(store_path):
-            notes.append(f"{store}: not created yet (Hermes creates it on first write)")
+            missing.append(store)
             continue
         stores_present += 1
         try:
@@ -737,19 +747,29 @@ def check_memory_hygiene():
             if len(mis_targets) > 3:
                 notes.append(f"{store}: {len(mis_targets)} user-profile entry(ies) total")
 
-        # Dynamic store benefits from entry dates (staleness tracking).
-        if store == "MEMORY.md" and entries and not any(_MEM_DATE_LEAD.match(e) for e in entries):
-            notes.append(
-                f"{store}: no entry has a [YYYY-MM-DD] date prefix — "
-                "dating entries makes staleness checkable"
-            )
+        # Dynamic store benefits from entry dates (staleness tracking): report
+        # every undated entry, not just an all-undated store.
+        if store == "MEMORY.md" and entries:
+            undated = [e for e in entries if not _MEM_DATE_LEAD.match(e)]
+            if len(undated) == len(entries):
+                notes.append(
+                    f"{store}: no entry has a [YYYY-MM-DD] date prefix — "
+                    "dating entries makes staleness checkable"
+                )
+            elif undated:
+                notes.append(
+                    f"{store}: {len(undated)} of {len(entries)} entries lack a "
+                    "[YYYY-MM-DD] date prefix — dating entries makes staleness checkable"
+                )
 
     if broken:
         return {"status": "broken", "reason": f"{len(broken)} memory issue(s)", "detail": broken + notes}
-    if notes:
-        return {"status": "informational", "reason": f"{len(notes)} memory note(s)", "detail": notes}
     if stores_present == 0:
         return {"status": "healthy", "reason": "no memory files yet (nothing to audit)", "detail": memories_dir}
+    for store in missing:
+        notes.append(f"{store}: not created yet (Hermes creates it on first write)")
+    if notes:
+        return {"status": "informational", "reason": f"{len(notes)} memory note(s)", "detail": notes}
     return {"status": "healthy", "reason": "memory stores within limits, no hygiene findings", "detail": memories_dir}
 
 
