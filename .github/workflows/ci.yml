@@ -11,7 +11,19 @@ permissions:
 
 jobs:
   plugin:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            experimental: false
+          - os: windows-latest
+            experimental: true
+    runs-on: ${{ matrix.os }}
+    # Windows is exploratory: it exercises platform-dependent paths in the
+    # pure-Python checks (path resolution, drive guards) without blocking
+    # merges. Promote to required once the job is stably green.
+    continue-on-error: ${{ matrix.experimental }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -20,18 +32,23 @@ jobs:
           python-version: "3.12"
 
       - name: Install Hermes
+        shell: bash
         run: |
           # pip/PyPI is no longer a supported Hermes distribution method
           # (PyPI is stale at 0.19.0). Install from the upstream git tag as an
           # editable install — wheel/sdist builds are blocked outside Nix, but
-          # editable installs are the documented dev path.
-          git clone --depth 1 --branch v2026.8.31 https://github.com/NousResearch/hermes-agent.git /tmp/hermes-agent
-          pip install -e /tmp/hermes-agent
+          # editable installs are the documented dev path. $RUNNER_TEMP keeps
+          # the clone path valid on both Linux and Windows runners.
+          git clone --depth 1 --branch v2026.8.31 https://github.com/NousResearch/hermes-agent.git "$RUNNER_TEMP/hermes-agent"
+          pip install -e "$RUNNER_TEMP/hermes-agent"
 
       - name: Python syntax check
         run: python -m py_compile __init__.py checks.py constants.py
 
       - name: Type check
+        # The /tmp package-copy workaround is POSIX-only; widen later if
+        # Windows mypy coverage is wanted.
+        if: runner.os == 'Linux'
         run: |
           pip install mypy types-PyYAML
           # mypy rejects the hyphenated `hermes-guide` dir as a package name;
@@ -41,6 +58,9 @@ jobs:
           mypy /tmp/hermes_guide
 
       - name: Plugin doctor
+        # Hermes-on-Windows CI is unexplored upstream; the runtime tests below
+        # already cover the plugin's own cross-platform paths.
+        if: runner.os == 'Linux'
         run: hermes plugins doctor . --ci
 
       - name: Docs self-claim guard
@@ -74,6 +94,29 @@ jobs:
 
       - name: Scope validation regression
         run: python tools/test_scope_validation.py
+
+      - name: Tap discovery smoke test
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
+        run: |
+          set -e
+          hermes skills tap add iap/hermes-guide
+          SKILLS="hermes-configuration-guide diagnosing-auth diagnosing-cli-tui diagnosing-commands diagnosing-hooks diagnosing-mcp diagnosing-path diagnosing-plugins diagnosing-skills"
+          for s in $SKILLS; do
+            echo "::group::install $s"
+            hermes skills install --yes "iap/hermes-guide/skills/$s"
+            echo "::endgroup::"
+          done
+          # No --force: every skill must pass the install scanner honestly.
+          missing=0
+          for s in $SKILLS; do
+            if ! hermes skills list | grep -q "$s"; then
+              echo "MISSING from hermes skills list: $s"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          echo "OK: all nine skills discovered after tap install"
 
       - name: Security lint (bandit)
         run: |
