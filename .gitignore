@@ -35,3 +35,6 @@ venv/
 *.log
 *.tgz
 *.zip
+
+# Local tool state
+.mimosa/

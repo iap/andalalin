@@ -5,7 +5,7 @@
 Hermes usage and self-diagnosis guide for [Hermes Agent](https://github.com/NousResearch/hermes-agent). **It complements — not replaces — Hermes's built-in diagnostics** (`hermes doctor`, `hermes verify`, and the platform helpers): it is an extra layer covering what they don't. It ships two things:
 
 1. **A plugin** — `/hermes-doctor` (in-session) and `hermes guide` (terminal): read-only diagnostics across config, MCP servers, skills, commands, hooks, and plugins.
-2. **Nine troubleshooting skills** — teach an agent how to locate and fix each surface, plus venv and auth guides.
+2. **Ten troubleshooting skills** — teach an agent how to locate and fix each surface, plus venv, auth, and memory guides.
 
 ## Install the plugin
 
@@ -61,8 +61,8 @@ hermes skills tap add iap/hermes-guide
 hermes skills install iap/hermes-guide/skills/hermes-configuration-guide
 ```
 
-The other eight skills use the same `iap/hermes-guide/skills/<name>` form:
-`diagnosing-mcp`, `diagnosing-skills`, `diagnosing-commands`, `diagnosing-hooks`, `diagnosing-plugins`, `diagnosing-path`, `diagnosing-cli-tui`, `diagnosing-auth`.
+The other nine skills use the same `iap/hermes-guide/skills/<name>` form:
+`diagnosing-mcp`, `diagnosing-skills`, `diagnosing-commands`, `diagnosing-hooks`, `diagnosing-plugins`, `diagnosing-path`, `diagnosing-cli-tui`, `diagnosing-auth`, `diagnosing-memory`.
 
 > [!NOTE]
 > The identifier must include the `skills/` prefix (it is the repo-relative path to the skill's `SKILL.md`). The shorter `iap/hermes-guide/<name>` form does not resolve.
@@ -82,6 +82,7 @@ Each installed skill is also available as a slash command (e.g. `/hermes-configu
 | `diagnosing-path` | Path issues — the dual-venv layout (.venv/venv), detection, canonical resolution order, cross-platform best practices |
 | `diagnosing-cli-tui` | CLI/TUI issues on native Windows — rendering artifacts, themes, busy indicators, mouse modes, encoding, launch/resume |
 | `diagnosing-auth` | Hub-install auth failures — dead/shadowing `GITHUB_TOKEN` in the profile `.env`, `gh-cli` fallback, 401 vs anonymous probes, rate-limit verdicts |
+| `diagnosing-memory` | Memory problems — built-in `MEMORY.md`/`USER.md` stores, external providers configured but silently unavailable, missing plugins/keys, char-limit and approval gates |
 
 ## Design principle
 
